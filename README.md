@@ -24,7 +24,16 @@ new proyect/
 ### 1. Abrir el Workspace
 Abre el archivo `loginova.code-workspace` en VS Code para cargar ambos proyectos simultáneamente.
 
-### 2. Frontend (Flutter)
+### 2. Ejecutar todo desde un solo comando
+Desde la raíz del proyecto ejecuta:
+
+```powershell
+.\scripts\run-all.ps1
+```
+
+Ese script restaura dependencias y abre el backend y el frontend en ventanas separadas.
+
+### 3. Frontend (Flutter)
 
 ```bash
 cd Loginova
@@ -48,7 +57,7 @@ flutter build ios
 - `image_picker`: Seleccionar imágenes
 - `shared_preferences`: Almacenamiento local
 
-### 3. Backend (.NET)
+### 4. Backend (.NET)
 
 ```bash
 cd LoginovaBackend/LoginovaAPI
@@ -74,12 +83,7 @@ dotnet publish -c Release
 
 ## 🔗 Conexión Frontend-Backend
 
-Asegúrate de configurar la URL base del API en el frontend:
-
-**En Loginova/lib/services/** (crear si no existe):
-```dart
-const String API_BASE_URL = 'http://localhost:5000'; // Ajusta el puerto
-```
+El frontend ya apunta al backend en `http://localhost:5105/api` desde [Loginova/lib/services/api_service.dart](Loginova/lib/services/api_service.dart#L7), que coincide con el puerto HTTP definido en [LoginovaBackend/LoginovaAPI/Properties/launchSettings.json](LoginovaBackend/LoginovaAPI/Properties/launchSettings.json#L7).
 
 ## 📝 Variables de Entorno
 

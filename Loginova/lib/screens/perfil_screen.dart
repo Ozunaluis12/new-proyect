@@ -41,10 +41,7 @@ class PerfilScreen extends StatelessWidget {
     final usuario = Provider.of<AuthProvider>(context).usuario;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mi Perfil'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Mi Perfil'), elevation: 0),
       body: usuario == null
           ? _buildNoUsuario()
           : SafeArea(
@@ -92,10 +89,7 @@ class PerfilScreen extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             'No hay usuario autenticado',
-            style: TextStyle(
-              fontSize: 18,
-              color: LoginovaColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 18, color: LoginovaColors.textSecondary),
           ),
         ],
       ),
@@ -127,11 +121,7 @@ class PerfilScreen extends StatelessWidget {
                 color: Colors.white.withOpacity(0.2),
                 border: Border.all(color: Colors.white, width: 2),
               ),
-              child: const Icon(
-                Icons.person,
-                size: 40,
-                color: Colors.white,
-              ),
+              child: const Icon(Icons.person, size: 40, color: Colors.white),
             ),
             const SizedBox(height: 16),
 

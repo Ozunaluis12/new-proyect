@@ -41,7 +41,7 @@ dotnet run
 - Mantén `Program.cs` limpio con solo configuración de servicios y middleware
 
 ### 6. Pruebas básicas
-- Ejecuta el API y prueba en el navegador `https://localhost:5001` o `http://localhost:5000`
+- Ejecuta el API y prueba en el navegador `https://localhost:7248` o `http://localhost:5105`
 - Verifica que las rutas de controllers respondan
 - Asegura que el frontend use la misma URL base del API
 

@@ -45,6 +45,18 @@
         "cwd": "${workspaceFolder}/LoginovaBackend/LoginovaAPI"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Loginova: Run All",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/run-all.ps1"
+      ],
+      "problemMatcher": []
     }
   ]
 }

@@ -27,9 +27,9 @@ flutter build ios
 
 ## Conectar con el backend
 Asegúrate de que la URL del backend sea correcta en tu archivo de configuración o constantes.
-Por ejemplo, si el backend corre en `localhost:5000`:
+Por ejemplo, si el backend corre en `localhost:5105`:
 ```dart
-const String API_BASE_URL = 'http://localhost:5000';
+const String API_BASE_URL = 'http://localhost:5105/api';
 ```
 
 ## Buenas prácticas para el frontend
