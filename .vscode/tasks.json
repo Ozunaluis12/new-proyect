@@ -1,0 +1,50 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Flutter: pub get",
+      "type": "shell",
+      "command": "flutter pub get",
+      "options": {
+        "cwd": "${workspaceFolder}/Loginova"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Flutter: Run",
+      "type": "shell",
+      "command": "flutter run",
+      "options": {
+        "cwd": "${workspaceFolder}/Loginova"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Flutter: Build APK",
+      "type": "shell",
+      "command": "flutter build apk",
+      "options": {
+        "cwd": "${workspaceFolder}/Loginova"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: dotnet restore",
+      "type": "shell",
+      "command": "dotnet restore",
+      "options": {
+        "cwd": "${workspaceFolder}/LoginovaBackend/LoginovaAPI"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: Run",
+      "type": "shell",
+      "command": "dotnet run",
+      "options": {
+        "cwd": "${workspaceFolder}/LoginovaBackend/LoginovaAPI"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

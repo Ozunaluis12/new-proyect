@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter: Launch Loginova",
+      "type": "dart",
+      "request": "launch",
+      "program": "${workspaceFolder}/Loginova/lib/main.dart",
+      "cwd": "${workspaceFolder}/Loginova"
+    },
+    {
+      "name": "Backend .NET: Launch API",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "Backend: dotnet restore",
+      "program": "${workspaceFolder}/LoginovaBackend/LoginovaAPI/bin/Debug/net10.0/LoginovaAPI.dll",
+      "cwd": "${workspaceFolder}/LoginovaBackend/LoginovaAPI",
+      "stopAtEntry": false,
+      "console": "internalConsole"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+# Root .gitignore for the whole Loginova monorepo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# VS Code settings
+# Mantener archivos de configuración de VS Code en el repositorio
+# para poder usar tareas y launch configs compartidas.
+
+# PowerShell logs
+*.log
+
+# Flutter build artifacts
+**/build/
+**/.dart_tool/
+**/.flutter-plugins-dependencies
+**/.packages
+**/pubspec.lock
+
+# Android build artifacts
+**/android/.gradle/
+**/android/app/build/
+**/android/app/*.iml
+
+# iOS build artifacts
+**/ios/Pods/
+**/ios/Runner.xcworkspace/
+**/ios/Flutter/Flutter.framework/
+**/ios/Flutter/Flutter.podspec
+
+# macOS build artifacts
+**/macos/Flutter/Flutter.framework/
+
+# Windows build artifacts
+**/windows/runner/Debug/
+**/windows/runner/Release/
+
+# Linux build artifacts
+**/linux/flutter/
+
+# .NET build artifacts
+**/bin/
+**/obj/
+**/*.user
+**/*.vs
+**/*.suo
+**/*.userosscache
+**/*.sln.docstates
+
+# JetBrains / IntelliJ files
+*.iml
+.idea/
+
+# Misc
+*.swp
+*.tmp
+*.bak

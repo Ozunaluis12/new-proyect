@@ -1,0 +1,20 @@
+@LoginovaAPI_HostAddress = http://localhost:5105
+@token = reemplaza_este_valor_con_el_token_del_login
+
+POST {{LoginovaAPI_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "correo": "admin@loginova.com",
+  "password": "admin123"
+}
+
+###
+
+GET {{LoginovaAPI_HostAddress}}/api/clientes
+Authorization: Bearer {{token}}
+
+###
+
+GET {{LoginovaAPI_HostAddress}}/api/recogidas
+Authorization: Bearer {{token}}
