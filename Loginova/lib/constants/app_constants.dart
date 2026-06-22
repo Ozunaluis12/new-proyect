@@ -27,9 +27,18 @@ class AppConstants {
     return 'http://localhost:5105/api';
   }
 
-  /// Google Maps API Key (CONFIGURAR AQUÍ)
-  /// TODO: Reemplazar con tu propia API key de Google Cloud Console
-  static const String googleMapsApiKey = 'TU_API_KEY_AQUI';
+  /// API key de Google Maps para las llamadas a Directions/Distance Matrix.
+  ///
+  /// Para desarrollo local puedes pasarla con:
+  /// flutter run --dart-define=GOOGLE_MAPS_API_KEY=TU_API_KEY
+  ///
+  /// En Flutter Web el mapa visual se carga desde web/index.html.
+  static const String googleMapsApiKey = String.fromEnvironment(
+    'GOOGLE_MAPS_API_KEY',
+    defaultValue: '',
+  );
+
+  static bool get hasGoogleMapsApiKey => googleMapsApiKey.trim().isNotEmpty;
 
   /// Firebase Project ID (CONFIGURAR AQUÍ)
   /// TODO: Reemplazar con tu Project ID de Firebase

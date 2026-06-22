@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'routes/app_routes.dart';
 import 'package:provider/provider.dart';
 
@@ -21,8 +20,10 @@ void main() async {
   // Inicializa Firebase
   await FirebaseService.initialize();
   
-  // Configura Google Maps API Key
-  MapsService.setApiKey(AppConstants.googleMapsApiKey);
+  // Configura Google Maps API Key si fue inyectada por entorno.
+  if (AppConstants.hasGoogleMapsApiKey) {
+    MapsService.setApiKey(AppConstants.googleMapsApiKey);
+  }
   
   runApp(const LoginovaApp());
 }

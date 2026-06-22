@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'location_service.dart';
 
 /// Información de una ruta entre dos puntos.
 class RouteInfo {
@@ -45,6 +44,8 @@ class LatLng {
 class MapsService {
   static const String _directionsUrl =
       'https://maps.googleapis.com/maps/api/directions/json';
+  static const String _osrmDirectionsBaseUrl =
+      'https://router.project-osrm.org/route/v1/driving';
 
   // TODO: Configurar API Key desde ambiente o configuración
   static String? _apiKey;
@@ -61,8 +62,7 @@ class MapsService {
     String travelMode = 'driving',
   }) async {
     if (_apiKey == null) {
-      print('API Key no configurada');
-      return null;
+      return _getRouteWithOsrm(origin: origin, destination: destination);
     }
 
     try {
@@ -117,6 +117,60 @@ class MapsService {
       );
     } catch (e) {
       print('Error obteniendo ruta: $e');
+      return null;
+    }
+  }
+
+  /// Fallback sin API key usando OSRM público (ideal para prototipo/demo).
+  static Future<RouteInfo?> _getRouteWithOsrm({
+    required LatLng origin,
+    required LatLng destination,
+  }) async {
+    try {
+      final url =
+          Uri.parse(
+            '$_osrmDirectionsBaseUrl/${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}',
+          ).replace(
+            queryParameters: {
+              'overview': 'full',
+              'geometries': 'polyline',
+              'alternatives': 'false',
+              'steps': 'false',
+            },
+          );
+
+      final response = await http.get(url);
+      if (response.statusCode != 200) {
+        print('Error en OSRM: ${response.statusCode}');
+        return null;
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['code'] != 'Ok') {
+        print('OSRM status: ${data['code']}');
+        return null;
+      }
+
+      final routes = data['routes'] as List<dynamic>;
+      if (routes.isEmpty) {
+        print('No se encontraron rutas en OSRM');
+        return null;
+      }
+
+      final route = routes.first as Map<String, dynamic>;
+      final distanceMeters = (route['distance'] as num).toDouble();
+      final durationSeconds = (route['duration'] as num).round();
+      final polylineEncoded = route['geometry'] as String;
+
+      return RouteInfo(
+        distanceMeters: distanceMeters,
+        duration: Duration(seconds: durationSeconds),
+        points: _decodePolyline(polylineEncoded),
+        polylineEncoded: polylineEncoded,
+        summary: 'Ruta estimada (OSRM)',
+      );
+    } catch (e) {
+      print('Error obteniendo ruta en OSRM: $e');
       return null;
     }
   }
@@ -236,10 +290,7 @@ class MapsService {
       final dlng = (result & 1) != 0 ? ~(result >> 1) : result >> 1;
       lng += dlng;
 
-      points.add(LatLng(
-        latitude: lat / 1e5,
-        longitude: lng / 1e5,
-      ));
+      points.add(LatLng(latitude: lat / 1e5, longitude: lng / 1e5));
     }
 
     return points;
@@ -260,8 +311,7 @@ class MapsService {
       const url = 'https://maps.googleapis.com/maps/api/distancematrix/json';
 
       final originsStr = origins.map((o) => o.toString()).join('|');
-      final destinationsStr =
-          destinations.map((d) => d.toString()).join('|');
+      final destinationsStr = destinations.map((d) => d.toString()).join('|');
 
       final response = await http.get(
         Uri.parse(url).replace(
@@ -292,10 +342,7 @@ class MapsService {
     required LatLng origin,
     required LatLng destination,
   }) async {
-    final route = await getRoute(
-      origin: origin,
-      destination: destination,
-    );
+    final route = await getRoute(origin: origin, destination: destination);
 
     if (route == null) return null;
 

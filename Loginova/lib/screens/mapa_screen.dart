@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../models/recogida.dart';
@@ -15,16 +16,13 @@ class MapaScreen extends StatefulWidget {
 }
 
 class _MapaScreenState extends State<MapaScreen> {
-  late GoogleMapController _mapController;
-  final Set<Marker> _markers = {};
+  final MapController _mapController = MapController();
+  final List<Marker> _markers = [];
 
   // Ubicación por defecto: Centro de Medellín, Colombia
   static const LatLng _ubicacionPorDefecto = LatLng(6.2442, -75.5812);
 
-  final CameraPosition _posicionInicial = const CameraPosition(
-    target: _ubicacionPorDefecto,
-    zoom: 13,
-  );
+  static const double _zoomInicial = 13;
 
   @override
   void dispose() {
@@ -57,20 +55,20 @@ class _MapaScreenState extends State<MapaScreen> {
 
       _markers.add(
         Marker(
-          markerId: MarkerId('recogida_${recogida.id}'),
-          position: coords,
-          infoWindow: InfoWindow(
-            title: 'Recogida #${recogida.id}',
-            snippet:
-                '${recogida.cantidadPaquetes} paquetes - ${recogida.estado}',
+          point: coords,
+          width: 42,
+          height: 42,
+          child: GestureDetector(
             onTap: () => _mostrarDetalles(recogida),
+            child: Icon(Icons.location_on, color: color, size: 36),
           ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(_getMarcadorHue(color)),
         ),
       );
     }
 
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   /// Obtiene el color según el estado de la recogida
@@ -89,16 +87,6 @@ class _MapaScreenState extends State<MapaScreen> {
       default:
         return LoginovaColors.textSecondary;
     }
-  }
-
-  /// Convierte Color a Hue para BitmapDescriptor
-  double _getMarcadorHue(Color color) {
-    // Simplificación: mapear colores a valores de hue
-    if (color == LoginovaColors.warning) return BitmapDescriptor.hueYellow;
-    if (color == LoginovaColors.success) return BitmapDescriptor.hueGreen;
-    if (color == LoginovaColors.error) return BitmapDescriptor.hueRed;
-    if (color == LoginovaColors.info) return BitmapDescriptor.hueBlue;
-    return BitmapDescriptor.hueOrange;
   }
 
   /// Muestra detalles de recogida al hacer clic en marcador
@@ -158,23 +146,29 @@ class _MapaScreenState extends State<MapaScreen> {
       appBar: AppBar(title: const Text('Mapa de Recogidas'), elevation: 0),
       body: Consumer<RecogidaProvider>(
         builder: (context, provider, _) {
-          // Actualizar marcadores cuando cambian recogidas
-          if (provider.recogidas.isNotEmpty && _markers.isEmpty) {
-            _actualizarMarcadores(provider.recogidas);
+          // Si llegan recogidas desde el provider, las pintamos sobre el mapa.
+          if (_markers.isEmpty && provider.recogidas.isNotEmpty) {
+            Future.microtask(() {
+              _actualizarMarcadores(provider.recogidas);
+            });
           }
 
           return Stack(
             children: [
-              GoogleMap(
-                onMapCreated: (controller) {
-                  _mapController = controller;
-                  _actualizarMarcadores(provider.recogidas);
-                },
-                initialCameraPosition: _posicionInicial,
-                markers: _markers,
-                myLocationEnabled: false,
-                zoomControlsEnabled: true,
-                mapToolbarEnabled: true,
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: _ubicacionPorDefecto,
+                  initialZoom: _zoomInicial,
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.loginova.app',
+                  ),
+                  MarkerLayer(markers: _markers),
+                ],
               ),
               if (provider.cargando)
                 const Center(
