@@ -39,6 +39,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Administrador")]
     public async Task<ActionResult<UsuarioResponse>> Create(UsuarioCreateRequest request)
     {
         if (await _context.Usuarios.AnyAsync(usuario => usuario.Correo == request.Correo))
@@ -68,6 +69,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Administrador")]
     public async Task<IActionResult> Update(int id, UsuarioUpdateRequest request)
     {
         var usuario = await _context.Usuarios.FindAsync(id);
@@ -101,6 +103,7 @@ public class UsuariosController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Administrador")]
     public async Task<IActionResult> Delete(int id)
     {
         var usuario = await _context.Usuarios.FindAsync(id);
