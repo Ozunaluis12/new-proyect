@@ -15,7 +15,15 @@ class EditarRecogidaScreen extends StatefulWidget {
 }
 
 class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
-  late TextEditingController estadoController;
+  static const List<String> _estadosPermitidos = [
+    'Pendiente',
+    'Asignada',
+    'En Ruta',
+    'Recogida',
+    'Cancelada',
+  ];
+
+  late String _estadoSeleccionado;
   late TextEditingController paquetesController;
   late TextEditingController observacionesController;
   bool guardando = false;
@@ -23,7 +31,9 @@ class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
   @override
   void initState() {
     super.initState();
-    estadoController = TextEditingController(text: widget.recogida.estado);
+    _estadoSeleccionado = _estadosPermitidos.contains(widget.recogida.estado)
+        ? widget.recogida.estado
+        : 'Pendiente';
     paquetesController = TextEditingController(
       text: widget.recogida.cantidadPaquetes.toString(),
     );
@@ -34,20 +44,12 @@ class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
 
   @override
   void dispose() {
-    estadoController.dispose();
     paquetesController.dispose();
     observacionesController.dispose();
     super.dispose();
   }
 
   Future<void> guardarCambios() async {
-    if (estadoController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El estado no puede quedar vacío')),
-      );
-      return;
-    }
-
     final cantidad = int.tryParse(paquetesController.text.trim());
     if (cantidad == null || cantidad < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -62,7 +64,7 @@ class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
       id: widget.recogida.id,
       clienteId: widget.recogida.clienteId,
       usuarioId: widget.recogida.usuarioId,
-      estado: estadoController.text.trim(),
+      estado: _estadoSeleccionado,
       cantidadPaquetes: cantidad,
       observaciones: observacionesController.text.trim(),
       evidencias: widget.recogida.evidencias,
@@ -95,9 +97,21 @@ class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            TextFormField(
-              controller: estadoController,
+            DropdownButtonFormField<String>(
+              initialValue: _estadoSeleccionado,
               decoration: const InputDecoration(labelText: 'Estado'),
+              items: _estadosPermitidos
+                  .map(
+                    (estado) =>
+                        DropdownMenuItem(value: estado, child: Text(estado)),
+                  )
+                  .toList(),
+              onChanged: guardando
+                  ? null
+                  : (value) {
+                      if (value == null) return;
+                      setState(() => _estadoSeleccionado = value);
+                    },
             ),
             const SizedBox(height: 20),
             TextFormField(
