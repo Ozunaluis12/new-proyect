@@ -167,5 +167,70 @@ Assert-True ($deleteRecResp.StatusCode -eq 204) "Eliminacion de recogida respond
 $deleteClienteResp = Invoke-WebRequest -Uri "$BaseUrl/clientes/$clienteId" -Method Delete -Headers $headers -UseBasicParsing
 Assert-True ($deleteClienteResp.StatusCode -eq 204) "Eliminacion de cliente de prueba responde 204"
 
+# === Prueba de seguridad: Solo Administrador puede crear usuarios ===
+$operadorEmail = "operador_test_$(Get-Random)@test.com"
+$operadorPass = "OperadorTest123!"
+
+# Registrar como Operador
+$regBody = @{
+    nombre = "Operador Test"
+    correo = $operadorEmail
+    password = $operadorPass
+    rol = "Administrador"  # Intentamos registrar como Admin, pero backend debe forzar Operador
+} | ConvertTo-Json
+
+$regResp = Invoke-RestMethod -Uri "$BaseUrl/auth/register" -Method Post -ContentType "application/json" -Body $regBody
+$operadorId = $regResp.usuario.id
+$operadorToken = $regResp.token
+
+# Login como Operador para obtener token fresco
+$loginBody = @{ correo = $operadorEmail; password = $operadorPass } | ConvertTo-Json
+$loginResp = Invoke-RestMethod -Uri "$BaseUrl/auth/login" -Method Post -ContentType "application/json" -Body $loginBody
+$operadorToken = $loginResp.token
+
+$operadorHeaders = @{ Authorization = "Bearer $operadorToken" }
+
+# Operador intenta crear usuario (debe fallar con 403)
+$crearUsuarioOperador = $false
+try {
+    $newUserBody = @{
+        nombre = "Usuario Nuevo"
+        correo = "user_test_$(Get-Random)@test.com"
+        password = "User123!"
+        rol = "Operador"
+    } | ConvertTo-Json
+    
+    Invoke-RestMethod -Uri "$BaseUrl/usuarios" -Method Post -ContentType "application/json" -Body $newUserBody -Headers $operadorHeaders | Out-Null
+} catch {
+    if ($_.Exception.Response.StatusCode.value__ -eq 403) {
+        $crearUsuarioOperador = $true
+    }
+}
+Assert-True $crearUsuarioOperador "Operador intenta crear usuario y recibe 403 (Forbidden)"
+
+# Admin crea usuario exitosamente
+$crearUsuarioAdmin = $false
+try {
+    $newUserBody = @{
+        nombre = "Usuario Admin Created"
+        correo = "admin_created_$(Get-Random)@test.com"
+        password = "AdminUser123!"
+        rol = "Operador"
+    } | ConvertTo-Json
+    
+    $adminCreateResp = Invoke-RestMethod -Uri "$BaseUrl/usuarios" -Method Post -ContentType "application/json" -Body $newUserBody -Headers $headers
+    $newUserId = $adminCreateResp.id
+    $crearUsuarioAdmin = ($adminCreateResp.id -gt 0)
+} catch {
+    Write-Host "[DEBUG] Error al crear usuario con Admin: $_" -ForegroundColor Yellow
+}
+Assert-True $crearUsuarioAdmin "Admin crea usuario exitosamente (respuesta tiene ID)"
+
+# Limpiar usuarios de prueba
+try {
+    Invoke-WebRequest -Uri "$BaseUrl/usuarios/$operadorId" -Method Delete -Headers $headers -UseBasicParsing | Out-Null
+    Invoke-WebRequest -Uri "$BaseUrl/usuarios/$newUserId" -Method Delete -Headers $headers -UseBasicParsing | Out-Null
+} catch { }
+
 Write-Host "" 
-Write-Host "Smoke test completado correctamente." -ForegroundColor Cyan
+Write-Host "Smoke test completado correctamente (24 assertions)." -ForegroundColor Cyan
