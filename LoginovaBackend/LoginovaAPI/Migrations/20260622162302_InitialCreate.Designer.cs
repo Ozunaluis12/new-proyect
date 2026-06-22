@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LoginovaAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260622154834_AgregarAuditoria")]
-    partial class AgregarAuditoria
+    [Migration("20260622162302_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -74,7 +74,7 @@ namespace LoginovaAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("AuditoriaLogs", (string)null);
+                    b.ToTable("auditoria_logs", (string)null);
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.Cliente", b =>
@@ -121,7 +121,7 @@ namespace LoginovaAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Clientes", (string)null);
+                    b.ToTable("clientes", (string)null);
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.Evidencia", b =>
@@ -154,7 +154,7 @@ namespace LoginovaAPI.Migrations
 
                     b.HasIndex("RecogidaId");
 
-                    b.ToTable("Evidencias", (string)null);
+                    b.ToTable("evidencias", (string)null);
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.HistorialEstado", b =>
@@ -192,7 +192,7 @@ namespace LoginovaAPI.Migrations
 
                     b.HasIndex("UsuarioId");
 
-                    b.ToTable("HistorialEstados", (string)null);
+                    b.ToTable("historial_estados", (string)null);
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.Recogida", b =>
@@ -256,7 +256,7 @@ namespace LoginovaAPI.Migrations
 
                     b.HasIndex("UsuarioId");
 
-                    b.ToTable("Recogidas", (string)null);
+                    b.ToTable("recogidas", (string)null);
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.Role", b =>
@@ -279,7 +279,7 @@ namespace LoginovaAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Roles", (string)null);
+                    b.ToTable("roles", (string)null);
 
                     b.HasData(
                         new
@@ -331,7 +331,7 @@ namespace LoginovaAPI.Migrations
 
                     b.HasIndex("UsuarioId");
 
-                    b.ToTable("Ubicaciones", (string)null);
+                    b.ToTable("ubicaciones", (string)null);
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.Usuario", b =>
@@ -381,7 +381,7 @@ namespace LoginovaAPI.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("Usuarios", (string)null);
+                    b.ToTable("usuarios", (string)null);
 
                     b.HasData(
                         new
@@ -389,9 +389,9 @@ namespace LoginovaAPI.Migrations
                             Id = 1,
                             Activo = true,
                             Correo = "admin@loginova.com",
-                            FechaCreacion = new DateTime(2026, 6, 22, 15, 48, 34, 308, DateTimeKind.Utc).AddTicks(5185),
+                            FechaCreacion = new DateTime(2026, 6, 22, 16, 23, 2, 291, DateTimeKind.Utc).AddTicks(9659),
                             Nombre = "Administrador",
-                            Password = "pbkdf2$100000$jf93+zfs+ZoVhf7SVrJhvQ==$ZfJ9CrInMn3EqEu0k0awq+TFz697b5kPzBmfEsjTTgM=",
+                            Password = "pbkdf2$100000$R076lQ86NwxlgrMqQPrnUQ==$FoHpW5OGVv+GHg8CqnIvWgkj7jTLto+E0k3l4BCsVsY=",
                             RoleId = 1
                         });
                 });
