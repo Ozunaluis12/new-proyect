@@ -98,6 +98,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 _buildActionButtons(),
                 const SizedBox(height: 16),
 
+                Text(
+                  'Todos los registros nuevos se crean con rol Operador.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: LoginovaColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
                 // Link a login
                 _buildLoginLink(),
               ],
