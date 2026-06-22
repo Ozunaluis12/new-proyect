@@ -1,10 +1,32 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Servicio que gestiona la configuración de la API y el almacenamiento de sesión.
 /// Proporciona métodos para manejar tokens y datos del usuario en SharedPreferences.
 class ApiService {
   /// URL base del servidor API backend.
-  static const String baseUrl = 'http://localhost:5105/api';
+  static const String _apiBaseFromEnv = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
+
+  static String get baseUrl {
+    if (_apiBaseFromEnv.isNotEmpty) {
+      return _apiBaseFromEnv;
+    }
+
+    if (kIsWeb) {
+      return 'http://localhost:5105/api';
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      // En emulador Android, localhost apunta al emulador, no al host.
+      return 'http://10.0.2.2:5105/api';
+    }
+
+    return 'http://localhost:5105/api';
+  }
+
   static const String _tokenKey = 'loginova_token';
   static const String _usuarioKey = 'loginova_usuario';
 

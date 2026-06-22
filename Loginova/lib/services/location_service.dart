@@ -32,7 +32,8 @@ class LocationData {
 class LocationService {
   static const int _updateIntervalSeconds = 30; // Actualizar cada 30 segundos
   static const int _fastestIntervalSeconds = 10; // Mínimo intervalo
-  static const double _distanceFilter = 5; // Mínimo de metros para actualizar
+  static const int _distanceFilterMeters =
+      5; // Mínimo de metros para actualizar
 
   StreamSubscription<Position>? _positionStream;
   Timer? _uploadTimer;
@@ -42,18 +43,18 @@ class LocationService {
   /// Solicita permisos de ubicación al dispositivo.
   static Future<bool> requestPermission() async {
     final permission = await Geolocator.checkPermission();
-    
+
     if (permission == LocationPermission.denied) {
       final newPermission = await Geolocator.requestPermission();
       return newPermission == LocationPermission.whileInUse ||
           newPermission == LocationPermission.always;
     }
-    
+
     if (permission == LocationPermission.deniedForever) {
       await Geolocator.openLocationSettings();
       return false;
     }
-    
+
     return permission == LocationPermission.whileInUse ||
         permission == LocationPermission.always;
   }
@@ -73,10 +74,8 @@ class LocationService {
       if (!isEnabled) return null;
 
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: _distanceFilter,
-        ),
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: _updateIntervalSeconds),
       );
 
       return LocationData(
@@ -96,19 +95,20 @@ class LocationService {
     if (_isTracking) return;
 
     _isTracking = true;
-    
+
     final locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: _distanceFilter,
+      distanceFilter: _distanceFilterMeters,
       timeLimit: const Duration(seconds: _updateIntervalSeconds),
     );
 
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((Position position) {
-      _lastPosition = position;
-      _uploadLocationToBackend(position);
-    });
+    _positionStream =
+        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+          (Position position) {
+            _lastPosition = position;
+            _uploadLocationToBackend(position);
+          },
+        );
 
     print('Rastreo de ubicación iniciado');
   }
@@ -167,9 +167,7 @@ class LocationService {
   }
 
   /// Obtiene coordenadas a partir de una dirección (forward geocoding).
-  static Future<LocationData?> getCoordinatesFromAddress(
-    String address,
-  ) async {
+  static Future<LocationData?> getCoordinatesFromAddress(String address) async {
     try {
       final locations = await geocoding.locationFromAddress(address);
 
@@ -209,4 +207,3 @@ class LocationService {
     stopTracking();
   }
 }
-

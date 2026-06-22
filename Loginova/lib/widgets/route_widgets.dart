@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/maps_provider.dart';
 import '../providers/location_provider.dart';
 import '../services/maps_service.dart';
 
@@ -47,7 +46,7 @@ class RouteInfoCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _InfoRow(
-              icon: Icons.distance,
+              icon: Icons.straighten,
               label: 'Distancia',
               value: '${route!.distanceKm.toStringAsFixed(1)} km',
             ),
