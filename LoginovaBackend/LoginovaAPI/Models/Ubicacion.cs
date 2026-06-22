@@ -27,6 +27,14 @@ public class Ubicacion
     [Column("longitud")]
     public decimal Longitud { get; set; }
 
+    /// <summary>Precision de la ubicacion en metros.</summary>
+    [Column("precision_metros")]
+    public double PrecisionMetros { get; set; }
+
+    /// <summary>Velocidad del dispositivo en m/s.</summary>
+    [Column("velocidad")]
+    public double? Velocidad { get; set; }
+
     /// <summary>Fecha y hora en que se registro la ubicacion.</summary>
     [Column("fecha_registro")]
     public DateTime FechaRegistro { get; set; } = DateTime.UtcNow;

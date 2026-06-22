@@ -43,6 +43,9 @@ public class AppDbContext : DbContext
     public DbSet<AuditoriaLog> Auditoria =>
         Set<AuditoriaLog>();
 
+    public DbSet<Notificacion> Notificaciones =>
+        Set<Notificacion>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

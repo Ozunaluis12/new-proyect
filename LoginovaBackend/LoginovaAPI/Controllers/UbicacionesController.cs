@@ -58,21 +58,32 @@ public class UbicacionesController : ControllerBase
     }
 
     /// <summary>Crea una nueva ubicacion para un operador.</summary>
-    /// <param name="request">Datos de la ubicacion (usuario, latitud, longitud).</param>
+    /// <param name="request">Datos de la ubicacion (latitud, longitud, precision).</param>
     /// <returns>La ubicacion creada con su identificador.</returns>
     [HttpPost]
     public async Task<ActionResult<Ubicacion>> Create(UbicacionRequest request)
     {
-        if (!await _context.Usuarios.AnyAsync(u => u.Id == request.UsuarioId))
+        // Extrae el usuarioId del token JWT
+        var usuarioIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (usuarioIdClaim == null || !int.TryParse(usuarioIdClaim.Value, out var usuarioId))
         {
-            return BadRequest(new { mensaje = "Usuario no existe" });
+            return Unauthorized(new { mensaje = "Usuario no identificado" });
+        }
+
+        var usuario = await _context.Usuarios.FindAsync(usuarioId);
+        if (usuario == null)
+        {
+            return NotFound(new { mensaje = "Usuario no existe" });
         }
 
         var ubicacion = new Ubicacion
         {
-            UsuarioId = request.UsuarioId,
+            UsuarioId = usuarioId,
             Latitud = request.Latitud,
             Longitud = request.Longitud,
+            PrecisionMetros = request.PrecisionMetros,
+            Velocidad = request.Velocidad,
+            FechaRegistro = request.FechaRegistro != default ? request.FechaRegistro : DateTime.UtcNow,
         };
 
         _context.Ubicaciones.Add(ubicacion);
@@ -94,14 +105,11 @@ public class UbicacionesController : ControllerBase
             return NotFound();
         }
 
-        if (!await _context.Usuarios.AnyAsync(u => u.Id == request.UsuarioId))
-        {
-            return BadRequest(new { mensaje = "Usuario no existe" });
-        }
-
-        ubicacion.UsuarioId = request.UsuarioId;
         ubicacion.Latitud = request.Latitud;
         ubicacion.Longitud = request.Longitud;
+        ubicacion.PrecisionMetros = request.PrecisionMetros;
+        ubicacion.Velocidad = request.Velocidad;
+        ubicacion.FechaRegistro = request.FechaRegistro != default ? request.FechaRegistro : DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
         return NoContent();

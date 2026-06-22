@@ -66,5 +66,16 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Permisos de ubicación -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Loginova necesita acceso a tu ubicación para rastrear recogidas mientras usas la app</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Loginova necesita acceso a tu ubicación en tiempo real para rastrear recogidas</string>
+	<!-- Permisos de cámara para evidencias -->
+	<key>NSCameraUsageDescription</key>
+	<string>Loginova necesita acceso a la cámara para capturar evidencias de recogidas</string>
+	<!-- Permisos de fotos -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Loginova necesita acceso a tu galería de fotos para evidencias</string>
 </dict>
 </plist>

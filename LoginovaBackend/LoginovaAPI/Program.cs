@@ -17,6 +17,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<PasswordHasher>();
 builder.Services.AddScoped<AuditoriaService>();
+builder.Services.AddScoped<NotificacionService>();
 
 builder.Services.AddCors(options =>
 {
