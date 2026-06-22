@@ -65,7 +65,7 @@ public class AuthController : ControllerBase
             return Conflict(new { mensaje = "El correo ya esta registrado" });
         }
 
-        var roleName = string.IsNullOrWhiteSpace(request.Rol) ? "Cliente" : request.Rol.Trim();
+        var roleName = "Operador";
         var role = await _context.Roles.SingleOrDefaultAsync(r => r.Nombre == roleName);
         if (role is null)
         {
