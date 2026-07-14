@@ -12,19 +12,27 @@
 - Usa `appsettings.Development.json` para valores locales
 - No subas contraseñas reales al repositorio
 
-### 3. Conexión al API
-Asegúrate de tener configurada la cadena de conexión en `appsettings.Development.json`:
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=loginova_db;Username=postgres;Password=postgres"
-  },
-  "Jwt": {
-    "Issuer": "LoginovaAPI",
-    "Audience": "LoginovaClient",
-    "Key": "LoginovaDevelopmentSecretKey2026ChangeMe"
-  }
-}
+### 3. Configuración requerida (entorno)
+El backend ahora exige valores sensibles por variables de entorno o user-secrets.
+
+PowerShell (ejemplo local):
+```powershell
+$env:ConnectionStrings__DefaultConnection = "Host=localhost;Port=5432;Database=loginova_bd;Username=postgres;Password=TU_PASSWORD"
+$env:Jwt__Issuer = "LoginovaAPI"
+$env:Jwt__Audience = "LoginovaClient"
+$env:Jwt__Key = "TU_JWT_KEY_LARGA_Y_SEGURA"
+
+# CORS (si no está en appsettings)
+$env:Cors__AllowedOrigins__0 = "http://localhost:3000"
+$env:Cors__AllowedOrigins__1 = "http://localhost:5105"
+
+# Firebase FCM (elige una opción)
+$env:Firebase__ProjectId = "tu-proyecto-firebase"
+$env:Firebase__ServiceAccountPath = "C:\ruta\service-account.json"
+# o
+# $env:Firebase__ServiceAccountJson = '{...json de service account...}'
+# o
+# $env:GOOGLE_APPLICATION_CREDENTIALS = "C:\ruta\service-account.json"
 ```
 
 ### 4. Ejecutar backend

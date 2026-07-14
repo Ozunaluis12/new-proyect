@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../constants/permission_constants.dart';
 import '../models/recogida.dart';
+import '../providers/auth_provider.dart';
 import '../providers/recogida_provider.dart';
 
 /// Pantalla que permite editar los datos de una recogida existente.
@@ -91,6 +93,19 @@ class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final usuario = Provider.of<AuthProvider>(context).usuario;
+    final puedeEditar =
+        usuario?.tienePermiso(PermissionConstants.editarRecogidas) ?? false;
+
+    if (!puedeEditar) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Editar Recogida')),
+        body: const Center(
+          child: Text('No tienes permiso para editar recogidas.'),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Editar Recogida')),
       body: Padding(

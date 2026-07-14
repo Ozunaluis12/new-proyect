@@ -11,6 +11,9 @@ Thumbs.db
 # PowerShell logs
 *.log
 
+# Local secrets for scripts
+scripts/.env.local.ps1
+
 # Flutter build artifacts
 **/build/
 **/.dart_tool/

@@ -1,94 +1,48 @@
 param(
-    [string]$ApiBaseUrl = "",
-    [switch]$Install,
-    [string]$DeviceId = ""
+    [string]$ApiBaseUrl = 'http://127.0.0.1:5105/api',
+    [string]$FlutterProject = '..\Loginova',
+    [switch]$PubGet
 )
 
-$ErrorActionPreference = "Stop"
-
-$rootPath = Split-Path -Parent $PSScriptRoot
-$frontendPath = Join-Path $rootPath 'Loginova'
-$apkPath = Join-Path $frontendPath 'build\app\outputs\flutter-apk\app-release.apk'
-
-Write-Host 'Generando APK de Loginova' -ForegroundColor Cyan
-
-if (-not (Test-Path $frontendPath)) {
-    Write-Host 'No se encontro el proyecto Flutter en Loginova.' -ForegroundColor Red
-    exit 1
-}
-
-if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) {
-    Write-Host 'Flutter no esta disponible en PATH.' -ForegroundColor Red
-    exit 1
-}
-
-Set-Location $frontendPath
-
-Write-Host '1/3 Restaurando dependencias de Flutter...' -ForegroundColor Yellow
-flutter pub get
-if ($LASTEXITCODE -ne 0) {
-    Write-Host 'Error al restaurar dependencias de Flutter.' -ForegroundColor Red
-    exit 1
-}
-
-$buildArgs = @('build', 'apk', '--release')
-
-if (-not [string]::IsNullOrWhiteSpace($ApiBaseUrl)) {
-    $buildArgs += "--dart-define=API_BASE_URL=$ApiBaseUrl"
-    Write-Host "Usando API_BASE_URL=$ApiBaseUrl" -ForegroundColor Cyan
-} else {
-    Write-Host 'No se paso API_BASE_URL. En un celular fisico, el APK intentara usar la URL por defecto de la app.' -ForegroundColor Yellow
-}
-
-Write-Host '2/3 Compilando APK...' -ForegroundColor Yellow
-& flutter @buildArgs
-if ($LASTEXITCODE -ne 0) {
-    Write-Host 'Error al compilar el APK.' -ForegroundColor Red
-    exit 1
-}
-
-if (-not (Test-Path $apkPath)) {
-    Write-Host "No se encontro el APK generado en $apkPath" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "APK generado en: $apkPath" -ForegroundColor Green
-
-if ($Install) {
-    Write-Host '3/3 Instalando en el dispositivo conectado...' -ForegroundColor Yellow
-
-    if (-not (Get-Command adb -ErrorAction SilentlyContinue)) {
-        Write-Host 'ADB no esta disponible en PATH. Instala Android platform-tools o agrega adb al PATH.' -ForegroundColor Red
-        exit 1
+function Get-LocalIPv4Address {
+    $interfaces = Get-NetIPAddress -AddressFamily IPv4 -PrefixOrigin Dhcp -ErrorAction SilentlyContinue
+    if (-not $interfaces) {
+        $interfaces = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue
     }
 
-    $devices = adb devices | Select-Object -Skip 1 | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
-    $connectedDevices = @($devices | Where-Object { $_ -match '\sdevice$' })
-
-    if ($connectedDevices.Count -eq 0) {
-        Write-Host 'No se detecto ningun dispositivo Android autorizado.' -ForegroundColor Red
-        Write-Host 'Activa la depuracion USB, conecta el celular y acepta la huella RSA.' -ForegroundColor Yellow
-        exit 1
+    foreach ($iface in $interfaces) {
+        if ($iface.IPAddress -and $iface.IPAddress -ne '127.0.0.1' -and $iface.IPAddress -notlike '169.254.*') {
+            return $iface.IPAddress
+        }
     }
 
-    if (-not [string]::IsNullOrWhiteSpace($DeviceId)) {
-        adb -s $DeviceId install -r $apkPath
-    } elseif ($connectedDevices.Count -eq 1) {
-        $DeviceId = ($connectedDevices[0] -split '\s+')[0]
-        adb -s $DeviceId install -r $apkPath
+    return $null
+}
+
+if ($ApiBaseUrl -eq 'http://127.0.0.1:5105/api') {
+    $localIp = Get-LocalIPv4Address
+    if ($localIp) {
+        Write-Host "Build-apk: detectada IP local $localIp. Usando backend accesible para dispositivo físico." -ForegroundColor Yellow
+        $ApiBaseUrl = "http://$($localIp):5105/api"
     } else {
-        Write-Host 'Hay mas de un dispositivo conectado. Vuelve a ejecutar el script con -DeviceId <id>.' -ForegroundColor Red
-        Write-Host 'Dispositivos detectados:' -ForegroundColor Yellow
-        $connectedDevices | ForEach-Object { Write-Host " - $_" }
-        exit 1
+        Write-Host 'Build-apk: no se pudo detectar una IP local. Si usas un dispositivo físico, pasa -ApiBaseUrl con la IP de tu PC.' -ForegroundColor Yellow
     }
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host 'Fallo la instalacion del APK.' -ForegroundColor Red
-        exit 1
-    }
-
-    Write-Host 'APK instalado correctamente en el dispositivo.' -ForegroundColor Green
 }
 
-Write-Host 'Listo.' -ForegroundColor Cyan
+$ErrorActionPreference = 'Stop'
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$flutterPath = Resolve-Path -Path (Join-Path $scriptRoot $FlutterProject)
+
+Write-Host 'Build-apk: generando APK con API_BASE_URL=' -NoNewline
+Write-Host $ApiBaseUrl -ForegroundColor Cyan
+
+Push-Location $flutterPath
+if ($PubGet) {
+    Write-Host 'Actualizando dependencias Flutter...' -ForegroundColor Yellow
+    flutter pub get
+}
+
+flutter build apk --release --dart-define="API_BASE_URL=$ApiBaseUrl"
+$exitCode = $LASTEXITCODE
+Pop-Location
+exit $exitCode

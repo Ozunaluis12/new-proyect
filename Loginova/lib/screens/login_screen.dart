@@ -38,7 +38,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (exito) {
-      Navigator.pushReplacementNamed(context, '/home');
+      final isAdmin = auth.usuario?.rol.toLowerCase() == 'administrador';
+      Navigator.pushReplacementNamed(context, isAdmin ? '/admin' : '/home');
       return;
     }
 
@@ -74,12 +75,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Logo y Título
                   _buildHeader(),
                   SizedBox(height: isMobile ? 40 : 50),
-                  
+
                   // Formulario
                   _buildLoginForm(),
-                  
+
                   SizedBox(height: isMobile ? 30 : 40),
-                  
+
                   // Links adicionales
                   _buildAdditionalLinks(),
                 ],
@@ -132,9 +133,9 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 8),
         Text(
           'Gestión Logística Profesional',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: LoginovaColors.textSecondary,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyLarge?.copyWith(color: LoginovaColors.textSecondary),
         ),
       ],
     );
@@ -168,7 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           // Campo de contraseña
           TextFormField(
             controller: _passwordController,
@@ -185,9 +186,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   _mostrarPassword ? Icons.visibility : Icons.visibility_off,
                   color: LoginovaColors.textSecondary,
                 ),
-                onPressed: () => setState(
-                  () => _mostrarPassword = !_mostrarPassword,
-                ),
+                onPressed: () =>
+                    setState(() => _mostrarPassword = !_mostrarPassword),
               ),
             ),
             validator: (value) {
@@ -201,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
             },
           ),
           const SizedBox(height: 24),
-          
+
           // Botón de inicio de sesión
           _buildLoginButton(),
         ],
@@ -229,10 +229,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   )
                 : const Text(
                     'Iniciar Sesión',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
           ),
         );

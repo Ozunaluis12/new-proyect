@@ -226,11 +226,162 @@ try {
 }
 Assert-True $crearUsuarioAdmin "Admin crea usuario exitosamente (respuesta tiene ID)"
 
+# === Prueba de permisos: Subadministrador con y sin ingresos ===
+$subadminEmail = "subadmin_test_$(Get-Random)@test.com"
+$subadminPass = "SubAdmin123!"
+$subadminPermisos = @(
+    "crear_recogidas",
+    "cambiar_estado_recogidas",
+    "subir_evidencias",
+    "registrar_ingresos",
+    "ver_ingresos"
+)
+
+$subadminBody = @{
+    nombre = "Subadmin Test"
+    correo = $subadminEmail
+    password = $subadminPass
+    rol = "Subadministrador"
+    permisos = $subadminPermisos
+} | ConvertTo-Json
+
+$subadminCreateResp = Invoke-RestMethod -Uri "$BaseUrl/usuarios" -Method Post -ContentType "application/json" -Body $subadminBody -Headers $headers
+$subadminId = $subadminCreateResp.id
+Assert-True ($subadminId -gt 0) "Admin crea subadministrador con ID valido"
+Assert-True ($subadminCreateResp.rol -eq "Subadministrador") "Subadministrador creado con rol correcto"
+
+$subadminLoginBody = @{ correo = $subadminEmail; password = $subadminPass } | ConvertTo-Json
+$subadminLoginResp = Invoke-RestMethod -Uri "$BaseUrl/auth/login" -Method Post -ContentType "application/json" -Body $subadminLoginBody
+$subadminHeaders = @{ Authorization = "Bearer $($subadminLoginResp.token)" }
+
+$subClienteBody = @{
+    nombre = "Cliente Subadmin $(Get-Date -Format yyyyMMddHHmmss)"
+    telefono = "3007770000"
+    direccion = "Direccion subadmin"
+    ciudad = "Cali"
+} | ConvertTo-Json
+
+$subClienteResp = Invoke-WebRequest -Uri "$BaseUrl/clientes" -Method Post -Headers $subadminHeaders -ContentType "application/json" -Body $subClienteBody -UseBasicParsing
+Assert-True ($subClienteResp.StatusCode -eq 201) "Subadministrador crea cliente de prueba"
+
+$subCliente = $subClienteResp.Content | ConvertFrom-Json
+$subClienteId = $subCliente.id
+Assert-True ($subClienteId -gt 0) "Cliente de subadministrador creado con ID valido"
+
+$subRecBody = @{
+    clienteId = $subClienteId
+    usuarioId = $subadminId
+    estado = "Pendiente"
+    cantidadPaquetes = 3
+    observaciones = "Recogida creada por subadministrador"
+    dineroRecibido = $false
+    montoCobrado = $null
+} | ConvertTo-Json
+
+$subRecResp = Invoke-WebRequest -Uri "$BaseUrl/recogidas" -Method Post -Headers $subadminHeaders -ContentType "application/json" -Body $subRecBody -UseBasicParsing
+Assert-True ($subRecResp.StatusCode -eq 201) "Subadministrador con permiso crea recogida"
+
+$subRec = $subRecResp.Content | ConvertFrom-Json
+$subRecId = $subRec.id
+Assert-True ($subRecId -gt 0) "Recogida creada por subadministrador con ID valido"
+
+$estadoConIngresoBody = @{
+    estado = "Recogida"
+    fotoUrl = "C:/tmp/evidencia-subadmin.jpg"
+    comentario = "Cobro recibido de cliente"
+    dineroRecibido = $true
+    montoCobrado = 12500.50
+    formaPago = "Efectivo"
+} | ConvertTo-Json
+
+$estadoConIngresoResp = Invoke-WebRequest -Uri "$BaseUrl/recogidas/$subRecId/estado" -Method Put -Headers $subadminHeaders -ContentType "application/json" -Body $estadoConIngresoBody -UseBasicParsing
+Assert-True ($estadoConIngresoResp.StatusCode -eq 200) "Subadministrador con permiso registra ingreso en recogida"
+
+$estadoConIngreso = $estadoConIngresoResp.Content | ConvertFrom-Json
+Assert-True ($estadoConIngreso.dineroRecibido -eq $true) "Respuesta confirma dinero recibido"
+Assert-True ([decimal]$estadoConIngreso.montoCobrado -eq [decimal]12500.50) "Respuesta confirma monto cobrado"
+
+$ingresosResp = Invoke-WebRequest -Uri "$BaseUrl/ingresos?cliente=Cliente%20Subadmin&operador=Subadmin%20Test" -Method Get -Headers $headers -UseBasicParsing
+Assert-True ($ingresosResp.StatusCode -eq 200) "Consulta de historial de ingresos responde 200"
+
+$ingresos = To-Array ($ingresosResp.Content | ConvertFrom-Json)
+$ingresoEncontrado = $false
+foreach ($ingreso in $ingresos) {
+    if ($ingreso.recogidaId -eq $subRecId -and $ingreso.formaPago -eq 'Efectivo') {
+        $ingresoEncontrado = $true
+        break
+    }
+}
+Assert-True $ingresoEncontrado "Historial de ingresos incluye el cobro registrado"
+
+$subadminLiteEmail = "subadmin_lite_$(Get-Random)@test.com"
+$subadminLitePass = "SubAdminLite123!"
+$subadminLiteBody = @{
+    nombre = "Subadmin Sin Ingresos"
+    correo = $subadminLiteEmail
+    password = $subadminLitePass
+    rol = "Subadministrador"
+    permisos = @(
+        "crear_recogidas",
+        "cambiar_estado_recogidas",
+        "subir_evidencias"
+    )
+} | ConvertTo-Json
+
+$subadminLiteCreateResp = Invoke-RestMethod -Uri "$BaseUrl/usuarios" -Method Post -ContentType "application/json" -Body $subadminLiteBody -Headers $headers
+$subadminLiteId = $subadminLiteCreateResp.id
+Assert-True ($subadminLiteId -gt 0) "Admin crea subadministrador sin permiso de ingresos"
+
+$subadminLiteLoginBody = @{ correo = $subadminLiteEmail; password = $subadminLitePass } | ConvertTo-Json
+$subadminLiteLoginResp = Invoke-RestMethod -Uri "$BaseUrl/auth/login" -Method Post -ContentType "application/json" -Body $subadminLiteLoginBody
+$subadminLiteHeaders = @{ Authorization = "Bearer $($subadminLiteLoginResp.token)" }
+
+$subLiteClienteBody = @{
+    nombre = "Cliente Subadmin Lite $(Get-Date -Format yyyyMMddHHmmss)"
+    telefono = "3006660000"
+    direccion = "Direccion subadmin lite"
+    ciudad = "Barranquilla"
+} | ConvertTo-Json
+
+$subLiteClienteResp = Invoke-WebRequest -Uri "$BaseUrl/clientes" -Method Post -Headers $subadminLiteHeaders -ContentType "application/json" -Body $subLiteClienteBody -UseBasicParsing
+$subLiteCliente = $subLiteClienteResp.Content | ConvertFrom-Json
+$subLiteClienteId = $subLiteCliente.id
+
+$subLiteRecBody = @{
+    clienteId = $subLiteClienteId
+    usuarioId = $subadminLiteId
+    estado = "Pendiente"
+    cantidadPaquetes = 1
+    observaciones = "Recogida subadmin sin ingresos"
+    dineroRecibido = $false
+    montoCobrado = $null
+} | ConvertTo-Json
+
+$subLiteRecResp = Invoke-WebRequest -Uri "$BaseUrl/recogidas" -Method Post -Headers $subadminLiteHeaders -ContentType "application/json" -Body $subLiteRecBody -UseBasicParsing
+$subLiteRec = $subLiteRecResp.Content | ConvertFrom-Json
+$subLiteRecId = $subLiteRec.id
+
+$ingresoSinPermisoBloqueado = $false
+try {
+    Invoke-RestMethod -Uri "$BaseUrl/recogidas/$subLiteRecId/estado" -Method Put -ContentType "application/json" -Body $estadoConIngresoBody -Headers $subadminLiteHeaders | Out-Null
+} catch {
+    if ($_.Exception.Response.StatusCode.value__ -eq 403) {
+        $ingresoSinPermisoBloqueado = $true
+    }
+}
+Assert-True $ingresoSinPermisoBloqueado "Subadministrador sin permiso de ingresos recibe 403 al registrar cobro"
+
 # Limpiar usuarios de prueba
 try {
+    Invoke-WebRequest -Uri "$BaseUrl/recogidas/$subRecId" -Method Delete -Headers $headers -UseBasicParsing | Out-Null
+    Invoke-WebRequest -Uri "$BaseUrl/clientes/$subClienteId" -Method Delete -Headers $headers -UseBasicParsing | Out-Null
+    Invoke-WebRequest -Uri "$BaseUrl/recogidas/$subLiteRecId" -Method Delete -Headers $headers -UseBasicParsing | Out-Null
+    Invoke-WebRequest -Uri "$BaseUrl/clientes/$subLiteClienteId" -Method Delete -Headers $headers -UseBasicParsing | Out-Null
     Invoke-WebRequest -Uri "$BaseUrl/usuarios/$operadorId" -Method Delete -Headers $headers -UseBasicParsing | Out-Null
     Invoke-WebRequest -Uri "$BaseUrl/usuarios/$newUserId" -Method Delete -Headers $headers -UseBasicParsing | Out-Null
+    Invoke-WebRequest -Uri "$BaseUrl/usuarios/$subadminId" -Method Delete -Headers $headers -UseBasicParsing | Out-Null
+    Invoke-WebRequest -Uri "$BaseUrl/usuarios/$subadminLiteId" -Method Delete -Headers $headers -UseBasicParsing | Out-Null
 } catch { }
 
 Write-Host "" 
-Write-Host "Smoke test completado correctamente (24 assertions)." -ForegroundColor Cyan
+Write-Host "Smoke test completado correctamente." -ForegroundColor Cyan

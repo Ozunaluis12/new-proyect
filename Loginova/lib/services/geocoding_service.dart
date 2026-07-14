@@ -1,84 +1,95 @@
-import 'package:geocoding/geocoding.dart' as geocoding;
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../utils/app_logger.dart';
 import 'location_service.dart';
 
 /// Servicio especializado para geocodificación y reverse geocodificación.
-/// Convierte direcciones a coordenadas y viceversa.
+/// Usa Nominatim (OpenStreetMap) como respaldo robusto para desktop y móvil.
 class GeocodingService {
+  static const _baseUrl = 'https://nominatim.openstreetmap.org';
+
+  static Uri buildSearchUri(String query, {int limit = 4}) {
+    return Uri.parse('$_baseUrl/search').replace(
+      queryParameters: {
+        'format': 'jsonv2',
+        'limit': limit.toString(),
+        'q': query,
+        'addressdetails': '1',
+        'accept-language': 'es',
+      },
+    );
+  }
+
+  static Uri buildReverseGeocodeUri(double latitude, double longitude) {
+    return Uri.parse('$_baseUrl/reverse').replace(
+      queryParameters: {
+        'format': 'jsonv2',
+        'lat': latitude.toString(),
+        'lon': longitude.toString(),
+        'accept-language': 'es',
+      },
+    );
+  }
+
   /// Convierte una dirección de texto a coordenadas (Geocodificación Directa).
-  /// 
-  /// Ejemplo: "Calle 10 123, Medellín" → (6.2442, -75.5812)
   static Future<LocationData?> geocodeAddress(String address) async {
     try {
       if (address.isEmpty) return null;
 
-      final locations = await geocoding.locationFromAddress(address);
+      final uri = buildSearchUri(address, limit: 3);
 
-      if (locations.isEmpty) {
-        print('No se encontraron coordenadas para: $address');
+      final response = await http.get(
+        uri,
+        headers: {'Accept': 'application/json', 'User-Agent': 'Loginova/1.0'},
+      );
+
+      if (response.statusCode != 200) {
+        AppLogger.warn('Geocodificación fallida: ${response.statusCode}');
         return null;
       }
 
-      final location = locations.first;
-      return LocationData(
-        latitude: location.latitude,
-        longitude: location.longitude,
-        accuracy: 0,
-        timestamp: DateTime.now(),
-      );
+      final data = jsonDecode(response.body) as List<dynamic>;
+      if (data.isEmpty) {
+        AppLogger.debug('No se encontraron coordenadas para: $address');
+        return null;
+      }
+
+      final first = data.first as Map<String, dynamic>;
+      return parseNominatimLocation(first);
     } catch (e) {
-      print('Error en geocodificación: $e');
+      AppLogger.warn('Error en geocodificación: $e', error: e);
       return null;
     }
   }
 
   /// Convierte coordenadas a dirección legible (Reverse Geocodificación).
-  /// 
-  /// Ejemplo: (6.2442, -75.5812) → "Calle 10, Medellín, Antioquia"
-  static Future<String?> reverseGeocode(double latitude, double longitude) async {
+  static Future<String?> reverseGeocode(
+    double latitude,
+    double longitude,
+  ) async {
     try {
-      final placemarks =
-          await geocoding.placemarkFromCoordinates(latitude, longitude);
+      final uri = buildReverseGeocodeUri(latitude, longitude);
 
-      if (placemarks.isEmpty) {
-        print('No se encontró dirección para: $latitude, $longitude');
+      final response = await http.get(
+        uri,
+        headers: {'Accept': 'application/json', 'User-Agent': 'Loginova/1.0'},
+      );
+
+      if (response.statusCode != 200) {
+        AppLogger.warn(
+          'Reverse geocodificación fallida: ${response.statusCode}',
+        );
         return null;
       }
 
-      final placemark = placemarks.first;
-      return _formatAddress(placemark);
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return formatNominatimAddress(data);
     } catch (e) {
-      print('Error en reverse geocodificación: $e');
+      AppLogger.warn('Error en reverse geocodificación: $e', error: e);
       return null;
     }
-  }
-
-  /// Formatea un placemark en una dirección legible.
-  static String _formatAddress(geocoding.Placemark placemark) {
-    final parts = <String>[];
-
-    if (placemark.street != null && placemark.street!.isNotEmpty) {
-      parts.add(placemark.street!);
-    }
-
-    if (placemark.subThoroughfare != null &&
-        placemark.subThoroughfare!.isNotEmpty) {
-      parts.add('#${placemark.subThoroughfare}');
-    }
-
-    if (placemark.locality != null && placemark.locality!.isNotEmpty) {
-      parts.add(placemark.locality!);
-    }
-
-    if (placemark.administrativeArea != null &&
-        placemark.administrativeArea!.isNotEmpty) {
-      parts.add(placemark.administrativeArea!);
-    }
-
-    if (placemark.postalCode != null && placemark.postalCode!.isNotEmpty) {
-      parts.add(placemark.postalCode!);
-    }
-
-    return parts.join(', ');
   }
 
   /// Obtiene múltiples direcciones candidatas para una búsqueda.
@@ -86,25 +97,22 @@ class GeocodingService {
     try {
       if (query.isEmpty) return [];
 
-      final locations = await geocoding.locationFromAddress(query);
+      final uri = buildSearchUri(query, limit: 4);
 
-      if (locations.isEmpty) return [];
+      final response = await http.get(
+        uri,
+        headers: {'Accept': 'application/json', 'User-Agent': 'Loginova/1.0'},
+      );
 
-      final addresses = <String>[];
-      for (var location in locations) {
-        final placemarks = await geocoding.placemarkFromCoordinates(
-          location.latitude,
-          location.longitude,
-        );
+      if (response.statusCode != 200) return [];
 
-        if (placemarks.isNotEmpty) {
-          addresses.add(_formatAddress(placemarks.first));
-        }
-      }
-
-      return addresses;
+      final data = jsonDecode(response.body) as List<dynamic>;
+      return data
+          .map((item) => formatNominatimAddress(item as Map<String, dynamic>))
+          .where((value) => value.isNotEmpty)
+          .toList();
     } catch (e) {
-      print('Error en búsqueda de direcciones: $e');
+      AppLogger.warn('Error en búsqueda de direcciones: $e', error: e);
       return [];
     }
   }
@@ -113,5 +121,47 @@ class GeocodingService {
   static Future<bool> validateAddress(String address) async {
     final location = await geocodeAddress(address);
     return location != null;
+  }
+
+  static String formatNominatimAddress(Map<String, dynamic> result) {
+    final displayName = result['display_name']?.toString() ?? '';
+    if (displayName.isNotEmpty) {
+      return displayName;
+    }
+
+    final address = result['address'];
+    if (address is Map<String, dynamic>) {
+      final parts = <String>[];
+      final road = address['road']?.toString();
+      final suburb = address['suburb']?.toString();
+      final city = address['city']?.toString() ?? address['town']?.toString();
+      final state = address['state']?.toString();
+      final country = address['country']?.toString();
+
+      if (road != null && road.isNotEmpty) parts.add(road);
+      if (suburb != null && suburb.isNotEmpty) parts.add(suburb);
+      if (city != null && city.isNotEmpty) parts.add(city);
+      if (state != null && state.isNotEmpty) parts.add(state);
+      if (country != null && country.isNotEmpty) parts.add(country);
+      return parts.join(', ');
+    }
+
+    return '';
+  }
+
+  static LocationData? parseNominatimLocation(Map<String, dynamic> result) {
+    final lat = double.tryParse(result['lat']?.toString() ?? '');
+    final lon = double.tryParse(result['lon']?.toString() ?? '');
+
+    if (lat == null || lon == null) {
+      return null;
+    }
+
+    return LocationData(
+      latitude: lat,
+      longitude: lon,
+      accuracy: 0,
+      timestamp: DateTime.now(),
+    );
   }
 }

@@ -39,7 +39,7 @@ class AuthService {
     String nombre,
     String correo,
     String password, {
-    String rol = 'Operador',
+    String rol = 'Cliente',
   }) async {
     final response = await http.post(
       Uri.parse('${ApiService.baseUrl}/auth/register'),

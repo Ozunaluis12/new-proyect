@@ -1,16 +1,21 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
+import '../constants/permission_constants.dart';
 import '../models/cliente.dart';
 import '../models/recogida.dart';
 import '../providers/auth_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/recogida_provider.dart';
 import '../services/cliente_service.dart';
+import '../services/geocoding_service.dart';
 import '../services/location_service.dart';
 import '../themes/app_theme.dart';
+import '../utils/app_logger.dart';
 
 /// Pantalla profesional para crear una nueva recogida con selección de ubicación
 class CrearRecogidaScreen extends StatefulWidget {
@@ -37,10 +42,14 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
   double? _selectedLatitude;
   double? _selectedLongitude;
 
+  Timer? _direccionDebounceTimer;
+  List<String> _addressSuggestions = [];
+  bool _isSearchingAddress = false;
   bool _guardando = false;
 
   @override
   void dispose() {
+    _direccionDebounceTimer?.cancel();
     _nombreController.dispose();
     _telefonoController.dispose();
     _direccionController.dispose();
@@ -50,6 +59,91 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
     super.dispose();
   }
 
+  void _onDireccionChanged(String value) {
+    final query = value.trim();
+
+    if (query.length < 3) {
+      if (mounted) {
+        setState(() => _addressSuggestions = []);
+      }
+      return;
+    }
+
+    _direccionDebounceTimer?.cancel();
+    _direccionDebounceTimer = Timer(
+      const Duration(milliseconds: 300),
+      () async {
+        if (!mounted) return;
+
+        final suggestions = await GeocodingService.searchAddresses(query);
+
+        if (!mounted) return;
+
+        setState(() {
+          _addressSuggestions = suggestions.take(4).toList();
+        });
+      },
+    );
+  }
+
+  Future<void> _buscarDireccionManual() async {
+    final query = _direccionController.text.trim();
+
+    if (query.isEmpty) {
+      setState(() => _addressSuggestions = []);
+      return;
+    }
+
+    setState(() => _isSearchingAddress = true);
+
+    try {
+      final location = await GeocodingService.geocodeAddress(query);
+
+      if (!mounted) return;
+
+      if (location != null) {
+        setState(() {
+          _selectedLatitude = location.latitude;
+          _selectedLongitude = location.longitude;
+          _addressSuggestions = [];
+        });
+
+        final address = await GeocodingService.reverseGeocode(
+          location.latitude,
+          location.longitude,
+        );
+
+        if (!mounted) return;
+
+        if (address != null && address.isNotEmpty) {
+          _direccionController.text = address;
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se encontró esa dirección. Prueba con otro texto.',
+            ),
+            backgroundColor: LoginovaColors.warning,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo buscar la dirección: ${e.toString()}'),
+            backgroundColor: LoginovaColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSearchingAddress = false);
+      }
+    }
+  }
+
   /// Abre el selector de ubicación en el mapa
   Future<void> _selectLocation() async {
     final locationProvider = Provider.of<LocationProvider>(
@@ -57,7 +151,7 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
       listen: false,
     );
 
-    final result = await Navigator.push<Map<String, double>>(
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (context) => _LocationPickerScreen(
@@ -71,23 +165,35 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
     );
 
     if (result != null) {
-      setState(() {
-        _selectedLatitude = result['latitude'];
-        _selectedLongitude = result['longitude'];
-      });
+      final latitude = result['latitude'] as double?;
+      final longitude = result['longitude'] as double?;
 
-      // Obtener dirección a partir de coordenadas
-      try {
-        final address = await LocationService.getAddressFromCoordinates(
-          _selectedLatitude!,
-          _selectedLongitude!,
-        );
+      if (latitude != null && longitude != null) {
+        setState(() {
+          _selectedLatitude = latitude;
+          _selectedLongitude = longitude;
+          _addressSuggestions = [];
+        });
 
-        if (address != null && mounted) {
+        final address = result['address']?.toString();
+
+        if (address != null && address.isNotEmpty && mounted) {
           _direccionController.text = address;
+        } else {
+          try {
+            final resolvedAddress =
+                await LocationService.getAddressFromCoordinates(
+                  latitude,
+                  longitude,
+                );
+
+            if (resolvedAddress != null && mounted) {
+              _direccionController.text = resolvedAddress;
+            }
+          } catch (e) {
+            AppLogger.warn('Error obteniendo dirección: $e', error: e);
+          }
         }
-      } catch (e) {
-        print('Error obteniendo dirección: $e');
       }
     }
   }
@@ -184,6 +290,19 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final puedeCrear =
+        auth.usuario?.tienePermiso(PermissionConstants.crearRecogidas) ?? false;
+
+    if (!puedeCrear) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Nueva Recogida'), elevation: 0),
+        body: const Center(
+          child: Text('No tienes permiso para crear recogidas.'),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Nueva Recogida'), elevation: 0),
       body: SafeArea(
@@ -347,14 +466,38 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
         const SizedBox(height: 16),
         TextFormField(
           controller: _direccionController,
-          textInputAction: TextInputAction.next,
+          textInputAction: TextInputAction.search,
+          onChanged: _onDireccionChanged,
+          onFieldSubmitted: (_) => _buscarDireccionManual(),
           decoration: InputDecoration(
             labelText: 'Dirección',
-            hintText: 'Se llena automáticamente desde el mapa',
+            hintText: 'Escribe la dirección o selecciónala en el mapa',
             prefixIcon: const Icon(Icons.location_on),
-            suffixIcon: _selectedLatitude != null
-                ? const Icon(Icons.check, color: LoginovaColors.success)
-                : null,
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isSearchingAddress)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: _buscarDireccionManual,
+                    tooltip: 'Buscar dirección',
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.map_outlined),
+                  onPressed: _selectLocation,
+                  tooltip: 'Seleccionar en el mapa',
+                ),
+              ],
+            ),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
@@ -363,6 +506,35 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
             return null;
           },
         ),
+        if (_addressSuggestions.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _addressSuggestions.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final suggestion = _addressSuggestions[index];
+                return ListTile(
+                  dense: true,
+                  title: Text(suggestion),
+                  leading: const Icon(Icons.location_on_outlined, size: 18),
+                  onTap: () {
+                    _direccionController.text = suggestion;
+                    _addressSuggestions = [];
+                    _buscarDireccionManual();
+                  },
+                );
+              },
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         TextFormField(
           controller: _ciudadController,
@@ -467,8 +639,12 @@ class _LocationPickerScreen extends StatefulWidget {
 
 class _LocationPickerScreenState extends State<_LocationPickerScreen> {
   late MapController _mapController;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   LatLng? _selectedLocation;
   late LatLng _centerLocation;
+  String? _resolvedAddress;
+  bool _isSearchingLocation = false;
 
   @override
   void initState() {
@@ -492,8 +668,81 @@ class _LocationPickerScreenState extends State<_LocationPickerScreen> {
 
   @override
   void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     _mapController.dispose();
     super.dispose();
+  }
+
+  Future<void> _buscarUbicacionEnMapa() async {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+
+    setState(() => _isSearchingLocation = true);
+
+    try {
+      final location = await GeocodingService.geocodeAddress(query);
+      if (!mounted) return;
+
+      if (location != null) {
+        final target = LatLng(location.latitude, location.longitude);
+        _mapController.move(target, 16);
+        setState(() {
+          _selectedLocation = target;
+          _centerLocation = target;
+          _resolvedAddress = null;
+        });
+
+        final address = await GeocodingService.reverseGeocode(
+          location.latitude,
+          location.longitude,
+        );
+
+        if (!mounted) return;
+        setState(() {
+          _resolvedAddress = address ?? query;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se encontró esa dirección en el mapa'),
+            backgroundColor: LoginovaColors.warning,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al buscar la ubicación: ${e.toString()}'),
+            backgroundColor: LoginovaColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSearchingLocation = false);
+      }
+    }
+  }
+
+  Future<void> _confirmarUbicacion() async {
+    if (_selectedLocation == null) return;
+
+    final address =
+        _resolvedAddress ??
+        await LocationService.getAddressFromCoordinates(
+          _selectedLocation!.latitude,
+          _selectedLocation!.longitude,
+        );
+
+    if (!mounted) return;
+
+    Navigator.pop(context, {
+      'latitude': _selectedLocation!.latitude,
+      'longitude': _selectedLocation!.longitude,
+      'address': address ?? _searchController.text.trim(),
+    });
   }
 
   @override
@@ -513,6 +762,7 @@ class _LocationPickerScreenState extends State<_LocationPickerScreen> {
               onTap: (tapPosition, point) {
                 setState(() {
                   _selectedLocation = point;
+                  _resolvedAddress = null;
                 });
               },
             ),
@@ -535,7 +785,9 @@ class _LocationPickerScreenState extends State<_LocationPickerScreen> {
                           border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
                             BoxShadow(
-                              color: LoginovaColors.primary.withValues(alpha: 0.5),
+                              color: LoginovaColors.primary.withValues(
+                                alpha: 0.5,
+                              ),
                               blurRadius: 8,
                               spreadRadius: 2,
                             ),
@@ -567,6 +819,51 @@ class _LocationPickerScreenState extends State<_LocationPickerScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            top: 12,
+            left: 12,
+            right: 12,
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.search, color: LoginovaColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => _buscarUbicacionEnMapa(),
+                        decoration: InputDecoration(
+                          hintText: 'Buscar dirección o lugar',
+                          border: InputBorder.none,
+                          suffixIcon: _isSearchingLocation
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                )
+                              : IconButton(
+                                  icon: const Icon(Icons.search),
+                                  onPressed: _buscarUbicacionEnMapa,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
           // Panel de información inferior
@@ -611,12 +908,7 @@ class _LocationPickerScreenState extends State<_LocationPickerScreen> {
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: _selectedLocation != null
-                          ? () {
-                              Navigator.pop(context, {
-                                'latitude': _selectedLocation!.latitude,
-                                'longitude': _selectedLocation!.longitude,
-                              });
-                            }
+                          ? _confirmarUbicacion
                           : null,
                       child: const Text('Confirmar ubicación'),
                     ),

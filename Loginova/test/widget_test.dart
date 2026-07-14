@@ -8,9 +8,9 @@ void main() {
 
     await tester.pumpWidget(const LoginovaApp());
 
-    expect(find.text('Loginova'), findsOneWidget);
-    expect(find.text('Correo'), findsOneWidget);
-    expect(find.text('Contrasena'), findsOneWidget);
-    expect(find.text('Ingresar'), findsOneWidget);
+    expect(find.text('LOGINOVA'), findsOneWidget);
+    expect(find.text('Correo Electrónico'), findsOneWidget);
+    expect(find.text('Contraseña'), findsOneWidget);
+    expect(find.text('Iniciar Sesión'), findsOneWidget);
   });
 }

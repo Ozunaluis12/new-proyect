@@ -16,7 +16,7 @@ class ApiService {
     }
 
     if (kIsWeb) {
-      return 'http://localhost:5105/api';
+      return 'http://127.0.0.1:5105/api';
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
@@ -24,7 +24,9 @@ class ApiService {
       return 'http://10.0.2.2:5105/api';
     }
 
-    return 'http://localhost:5105/api';
+    // En desktop/Windows, localhost puede resolverse a IPv6 (::1),
+    // mientras que el backend suele exponerse en IPv4 127.0.0.1.
+    return 'http://127.0.0.1:5105/api';
   }
 
   static const String _tokenKey = 'loginova_token';

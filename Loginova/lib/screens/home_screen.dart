@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/recogida_provider.dart';
 import '../themes/app_theme.dart';
+import '../widgets/menu_drawer.dart';
 import 'recogidas_screen.dart';
 import 'perfil_screen.dart';
 import 'mapa_screen.dart';
@@ -75,6 +76,7 @@ class DashboardView extends StatelessWidget {
     final usuario = Provider.of<AuthProvider>(context).usuario;
 
     return Scaffold(
+      drawer: const MenuDrawer(currentRoute: '/home'),
       appBar: AppBar(
         title: const Text('Dashboard'),
         elevation: 0,

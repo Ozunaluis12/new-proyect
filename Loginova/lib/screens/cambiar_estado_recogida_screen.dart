@@ -1,0 +1,237 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+
+import '../constants/permission_constants.dart';
+import '../models/recogida.dart';
+import '../providers/auth_provider.dart';
+import '../services/recogida_service.dart';
+import 'registrar_ingreso_screen.dart';
+
+class CambiarEstadoRecogidaScreen extends StatefulWidget {
+  final Recogida recogida;
+
+  const CambiarEstadoRecogidaScreen({super.key, required this.recogida});
+
+  @override
+  State<CambiarEstadoRecogidaScreen> createState() =>
+      _CambiarEstadoRecogidaScreenState();
+}
+
+class _CambiarEstadoRecogidaScreenState
+    extends State<CambiarEstadoRecogidaScreen> {
+  static const List<String> _estadosPermitidos = [
+    'Pendiente',
+    'Recogida',
+    'Cancelada',
+  ];
+
+  final _comentarioController = TextEditingController();
+  final _service = RecogidaService();
+
+  File? _imagen;
+  late String _estadoSeleccionado;
+  bool _dineroRecibido = false;
+  bool _guardando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _estadoSeleccionado = _estadosPermitidos.contains(widget.recogida.estado)
+        ? widget.recogida.estado
+        : 'Pendiente';
+  }
+
+  @override
+  void dispose() {
+    _comentarioController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _tomarFoto() async {
+    final picker = ImagePicker();
+
+    try {
+      final foto = await picker.pickImage(source: ImageSource.camera);
+
+      if (foto != null && mounted) {
+        setState(() {
+          _imagen = File(foto.path);
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+
+      try {
+        final foto = await picker.pickImage(source: ImageSource.gallery);
+
+        if (foto != null && mounted) {
+          setState(() {
+            _imagen = File(foto.path);
+          });
+        }
+      } catch (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se pudo abrir la cámara. Puedes elegir una foto desde la galería.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _guardar() async {
+    double? montoCobrado;
+    String? formaPago;
+    File? fotoParaEvidencia;
+
+    if (_dineroRecibido) {
+      if (_estadoSeleccionado.toLowerCase() != 'recogida') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Solo puedes registrar dinero al completar la recogida',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final ingreso = await Navigator.push<IngresoDraft>(
+        context,
+        MaterialPageRoute(builder: (_) => const RegistrarIngresoScreen()),
+      );
+
+      if (ingreso == null) {
+        return;
+      }
+
+      montoCobrado = ingreso.monto;
+      formaPago = ingreso.formaPago;
+      fotoParaEvidencia = ingreso.foto;
+    }
+
+    if (_imagen == null && fotoParaEvidencia == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Debes tomar una foto antes de guardar')),
+      );
+      return;
+    }
+
+    setState(() => _guardando = true);
+
+    try {
+      final actualizada = await _service.actualizarEstadoRecogida(
+        widget.recogida.id,
+        estado: _estadoSeleccionado,
+        foto: fotoParaEvidencia ?? _imagen,
+        dineroRecibido: _dineroRecibido,
+        montoCobrado: montoCobrado,
+        formaPago: formaPago,
+        comentario: _comentarioController.text.trim(),
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context, actualizada);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo actualizar el estado')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _guardando = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final usuario = Provider.of<AuthProvider>(context).usuario;
+    final puedeRegistrarIngresos =
+        usuario?.tienePermiso(PermissionConstants.registrarIngresos) ?? false;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Estado y evidencia')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: _estadoSeleccionado,
+              decoration: const InputDecoration(labelText: 'Estado'),
+              items: _estadosPermitidos
+                  .map(
+                    (estado) =>
+                        DropdownMenuItem(value: estado, child: Text(estado)),
+                  )
+                  .toList(),
+              onChanged: _guardando
+                  ? null
+                  : (value) {
+                      if (value == null) return;
+                      setState(() => _estadoSeleccionado = value);
+                    },
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _guardando ? null : _tomarFoto,
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('Tomar foto de soporte'),
+            ),
+            const SizedBox(height: 16),
+            if (_imagen != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(_imagen!, height: 240, fit: BoxFit.cover),
+              ),
+              const SizedBox(height: 20),
+            ],
+            if (puedeRegistrarIngresos) ...[
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Dinero recibido'),
+                value: _dineroRecibido,
+                onChanged: _guardando
+                    ? null
+                    : (value) {
+                        setState(() => _dineroRecibido = value);
+                      },
+              ),
+              if (_dineroRecibido)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8, bottom: 16),
+                  child: Text(
+                    'Al guardar pasarás a la vista para registrar cantidad y forma de pago.',
+                  ),
+                ),
+            ],
+            TextField(
+              controller: _comentarioController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: 'Comentario',
+                hintText:
+                    'Escribe aquí la cantidad de paquetes y observaciones',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _guardando ? null : _guardar,
+                child: Text(_guardando ? 'Guardando...' : 'Guardar cambios'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

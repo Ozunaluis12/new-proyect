@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace LoginovaAPI.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Administrador")]
 [Route("api/[controller]")]
 public class UsuariosController : ControllerBase
 {
@@ -34,7 +34,8 @@ public class UsuariosController : ControllerBase
                 usuario.Id,
                 usuario.Nombre,
                 usuario.Correo,
-                usuario.Rol))
+                usuario.Rol,
+                usuario.Permisos))
             .ToListAsync();
 
         return Ok(usuarios);
@@ -47,6 +48,16 @@ public class UsuariosController : ControllerBase
         if (await _context.Usuarios.AnyAsync(usuario => usuario.Correo == request.Correo))
         {
             return Conflict(new { mensaje = "El correo ya esta registrado" });
+        }
+
+        if (!PermisosCatalogo.RolesGestion.Contains(request.Rol))
+        {
+            return BadRequest(new { mensaje = "Solo se pueden crear Operador o Subadministrador desde el panel" });
+        }
+
+        if (!PermisosService.SonPermisosValidos(request.Permisos))
+        {
+            return BadRequest(new { mensaje = "Uno o más permisos no son válidos" });
         }
 
         var role = await _context.Roles.SingleOrDefaultAsync(r => r.Nombre == request.Rol);
@@ -63,6 +74,8 @@ public class UsuariosController : ControllerBase
             RoleId = role.Id,
         };
 
+        usuario.EstablecerPermisos(PermisosService.NormalizarPermisos(request.Permisos));
+
         _context.Usuarios.Add(usuario);
         await _context.SaveChangesAsync();
 
@@ -74,7 +87,7 @@ public class UsuariosController : ControllerBase
             usuario.Id,
             "CREATE",
             null,
-            new { usuario.Nombre, usuario.Correo, Rol = request.Rol },
+            new { usuario.Nombre, usuario.Correo, Rol = request.Rol, Permisos = usuario.Permisos },
             $"Usuario creado: {usuario.Nombre} ({usuario.Correo})",
             HttpContext.Connection.RemoteIpAddress?.ToString()
         );
@@ -98,6 +111,16 @@ public class UsuariosController : ControllerBase
             return Conflict(new { mensaje = "El correo ya esta registrado por otro usuario" });
         }
 
+        if (!PermisosCatalogo.RolesGestion.Contains(request.Rol))
+        {
+            return BadRequest(new { mensaje = "Solo se pueden asignar roles Operador o Subadministrador" });
+        }
+
+        if (!PermisosService.SonPermisosValidos(request.Permisos))
+        {
+            return BadRequest(new { mensaje = "Uno o más permisos no son válidos" });
+        }
+
         var role = await _context.Roles.SingleOrDefaultAsync(r => r.Nombre == request.Rol);
         if (role is null)
         {
@@ -105,11 +128,12 @@ public class UsuariosController : ControllerBase
         }
 
         // Guardar valores anteriores para auditoría
-        var valoresAnteriores = new { usuario.Nombre, usuario.Correo, usuario.Rol };
+        var valoresAnteriores = new { usuario.Nombre, usuario.Correo, usuario.Rol, Permisos = usuario.Permisos };
 
         usuario.Nombre = request.Nombre;
         usuario.Correo = request.Correo;
         usuario.RoleId = role.Id;
+        usuario.EstablecerPermisos(PermisosService.NormalizarPermisos(request.Permisos));
 
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
@@ -126,7 +150,7 @@ public class UsuariosController : ControllerBase
             usuario.Id,
             "UPDATE",
             valoresAnteriores,
-            new { usuario.Nombre, usuario.Correo, Rol = request.Rol },
+            new { usuario.Nombre, usuario.Correo, Rol = request.Rol, Permisos = usuario.Permisos },
             $"Usuario #{usuario.Id} actualizado",
             HttpContext.Connection.RemoteIpAddress?.ToString()
         );
@@ -168,6 +192,6 @@ public class UsuariosController : ControllerBase
 
     private static UsuarioResponse ToResponse(Usuario usuario)
     {
-        return new UsuarioResponse(usuario.Id, usuario.Nombre, usuario.Correo, usuario.Rol);
+        return new UsuarioResponse(usuario.Id, usuario.Nombre, usuario.Correo, usuario.Rol, usuario.Permisos);
     }
 }

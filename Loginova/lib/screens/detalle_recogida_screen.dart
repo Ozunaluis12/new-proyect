@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../constants/permission_constants.dart';
 import '../models/recogida.dart';
+import '../providers/auth_provider.dart';
 import '../themes/app_theme.dart';
+import 'cambiar_estado_recogida_screen.dart';
 import 'editar_recogida_screen.dart';
 import 'evidencia_screen.dart';
+import 'historial_estados_screen.dart';
 
 /// Pantalla profesional que muestra los detalles completos de una recogida.
 class DetalleRecogidaScreen extends StatefulWidget {
@@ -65,6 +70,26 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
     }
   }
 
+  Future<void> _cambiarEstado() async {
+    final actualizada = await Navigator.push<Recogida>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CambiarEstadoRecogidaScreen(recogida: _recogida),
+      ),
+    );
+
+    if (actualizada != null && mounted) {
+      setState(() {
+        _recogida = actualizada;
+        _evidencias = List<String>.from(actualizada.evidencias);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Estado actualizado correctamente')),
+      );
+    }
+  }
+
   /// Obtiene el color según el estado de la recogida
   Color _getEstadoColor(String estado) {
     switch (estado.toLowerCase()) {
@@ -107,10 +132,7 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
     final icon = _getEstadoIcon(_recogida.estado);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Detalle de Recogida'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Detalle de Recogida'), elevation: 0),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -152,6 +174,14 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
                 ],
               ),
               const SizedBox(height: 24),
+
+              if (_recogida.dineroRecibido ||
+                  (_recogida.montoCobrado ?? 0) > 0) ...[
+                _buildSectionTitle('Ingresos'),
+                const SizedBox(height: 12),
+                _buildInfoCardIngresos(),
+                const SizedBox(height: 24),
+              ],
 
               // Paquetes
               _buildSectionTitle('Paquetes'),
@@ -255,6 +285,33 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
     );
   }
 
+  Widget _buildInfoCardIngresos() {
+    return Card(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: LoginovaColors.divider),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            _buildInfoRow(
+              'Dinero recibido',
+              _recogida.dineroRecibido ? 'Sí' : 'No',
+            ),
+            const Divider(height: 16),
+            _buildInfoRow(
+              'Monto cobrado',
+              _recogida.montoCobrado == null
+                  ? 'Sin monto'
+                  : '\$${_recogida.montoCobrado!.toStringAsFixed(2)}',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Construye una fila de información
   Widget _buildInfoRow(String label, String value) {
     return Row(
@@ -262,15 +319,15 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: LoginovaColors.textSecondary,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: LoginovaColors.textSecondary),
         ),
         Text(
           value,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -301,8 +358,8 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
                 Text(
                   label,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: LoginovaColors.textSecondary,
-                      ),
+                    color: LoginovaColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -341,10 +398,7 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
                 color: LoginovaColors.secondary.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                Icons.inventory_2,
-                color: LoginovaColors.secondary,
-              ),
+              child: Icon(Icons.inventory_2, color: LoginovaColors.secondary),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -354,16 +408,16 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
                   Text(
                     'Total de Paquetes',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: LoginovaColors.textSecondary,
-                        ),
+                      color: LoginovaColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${_recogida.cantidadPaquetes}',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: LoginovaColors.secondary,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      color: LoginovaColors.secondary,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -394,8 +448,8 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
                 Text(
                   'Notas',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: LoginovaColors.textSecondary,
-                      ),
+                    color: LoginovaColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -415,9 +469,9 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
     return Text(
       title,
       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: LoginovaColors.primary,
-          ),
+        fontWeight: FontWeight.bold,
+        color: LoginovaColors.primary,
+      ),
     );
   }
 
@@ -438,8 +492,8 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
               Text(
                 'No hay evidencias',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: LoginovaColors.textSecondary,
-                    ),
+                  color: LoginovaColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -458,28 +512,56 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
       ),
       itemCount: _evidencias.length,
       itemBuilder: (context, index) {
+        final url = _evidencias[index];
         return Card(
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: LoginovaColors.background,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.image,
-                  size: 48,
-                  color: LoginovaColors.primary,
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: LoginovaColors.background,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.broken_image_outlined,
+                          size: 40,
+                          color: LoginovaColors.textSecondary,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No se pudo cargar',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              Positioned(
+                left: 8,
+                bottom: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Evidencia ${index + 1}',
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Evidencia ${index + 1}',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -488,37 +570,85 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
 
   /// Construye los botones de acción
   Widget _buildActionButtons() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Volver'),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.add_a_photo),
-                label: const Text('Evidencia'),
-                onPressed: _agregarEvidencia,
-              ),
-            ),
-          ],
+    final usuario = Provider.of<AuthProvider>(context).usuario;
+    final puedeEditar =
+        usuario?.tienePermiso(PermissionConstants.editarRecogidas) ?? false;
+    final puedeCambiarEstado =
+        usuario?.tienePermiso(PermissionConstants.cambiarEstadoRecogidas) ??
+        false;
+    final puedeSubirEvidencias =
+        usuario?.tienePermiso(PermissionConstants.subirEvidencias) ?? false;
+
+    final botones = <Widget>[];
+
+    if (puedeEditar) {
+      botones.addAll([
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _editarRecogida,
+            icon: const Icon(Icons.edit),
+            label: const Text('Editar Recogida'),
+          ),
         ),
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Editar Recogida'),
-            onPressed: _editarRecogida,
+            onPressed: _agregarEvidencia,
+            icon: const Icon(Icons.camera_alt),
+            label: const Text('Agregar Evidencia'),
           ),
         ),
-      ],
+      ]);
+    } else if (puedeCambiarEstado || puedeSubirEvidencias) {
+      botones.addAll([
+        if (puedeCambiarEstado)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _cambiarEstado,
+              icon: const Icon(Icons.fact_check_outlined),
+              label: const Text('Cambiar estado y evidencia'),
+            ),
+          ),
+        if (puedeCambiarEstado && puedeSubirEvidencias)
+          const SizedBox(height: 12),
+        if (puedeSubirEvidencias)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _agregarEvidencia,
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('Agregar Evidencia'),
+            ),
+          ),
+      ]);
+    }
+
+    botones.addAll([
+      const SizedBox(height: 12),
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          icon: const Icon(Icons.timeline),
+          label: const Text('Ver Historial de Estados'),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    HistorialEstadosScreen(recogidaId: _recogida.id),
+              ),
+            );
+          },
+        ),
+      ),
+    ]);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: botones,
     );
   }
 }

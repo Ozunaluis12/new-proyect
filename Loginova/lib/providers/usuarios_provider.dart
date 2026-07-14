@@ -42,4 +42,46 @@ class UsuariosProvider extends ChangeNotifier {
       rethrow;
     }
   }
+
+  /// Crea un usuario con permisos.
+  Future<Usuario> crearUsuario({
+    required String nombre,
+    required String correo,
+    required String password,
+    required String rol,
+    required List<String> permisos,
+  }) async {
+    final usuario = await _service.crearUsuario(
+      nombre: nombre,
+      correo: correo,
+      password: password,
+      rol: rol,
+      permisos: permisos,
+    );
+
+    _usuarios.add(usuario);
+    notifyListeners();
+    return usuario;
+  }
+
+  /// Actualiza un usuario con permisos.
+  Future<void> actualizarUsuario({
+    required int id,
+    required String nombre,
+    required String correo,
+    String? password,
+    required String rol,
+    required List<String> permisos,
+  }) async {
+    await _service.actualizarUsuario(
+      id: id,
+      nombre: nombre,
+      correo: correo,
+      password: password,
+      rol: rol,
+      permisos: permisos,
+    );
+
+    await cargarUsuarios();
+  }
 }

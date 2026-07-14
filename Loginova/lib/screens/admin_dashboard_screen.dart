@@ -3,9 +3,14 @@ import 'package:provider/provider.dart';
 
 import '../models/usuario.dart';
 import '../providers/auth_provider.dart';
+import '../providers/ingresos_provider.dart';
 import '../providers/recogida_provider.dart';
 import '../providers/usuarios_provider.dart';
+import '../constants/permission_constants.dart';
 import '../themes/app_theme.dart';
+import '../widgets/menu_drawer.dart';
+import 'crear_editar_usuario_screen.dart';
+import 'ingresos_admin_tab.dart';
 
 /// Panel de administrador con reportes y gestión de usuarios.
 class AdminDashboardScreen extends StatefulWidget {
@@ -22,6 +27,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<UsuariosProvider>(context, listen: false).cargarUsuarios();
       Provider.of<RecogidaProvider>(context, listen: false).cargarRecogidas();
+      Provider.of<IngresosProvider>(context, listen: false).cargarIngresos();
     });
   }
 
@@ -40,20 +46,51 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
+        drawer: const MenuDrawer(currentRoute: '/admin'),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CrearEditarUsuarioScreen(),
+              ),
+            );
+
+            if (!context.mounted) return;
+            await Provider.of<UsuariosProvider>(
+              context,
+              listen: false,
+            ).cargarUsuarios();
+          },
+          icon: const Icon(Icons.person_add),
+          label: const Text('Nuevo usuario'),
+        ),
         appBar: AppBar(
           title: const Text('Panel de Administrador'),
           elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.fact_check),
+              tooltip: 'Ver auditoría',
+              onPressed: () => Navigator.pushNamed(context, '/auditoria'),
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.bar_chart), text: 'Reportes'),
+              Tab(icon: Icon(Icons.payments), text: 'Ingresos'),
               Tab(icon: Icon(Icons.people), text: 'Usuarios'),
             ],
           ),
         ),
         body: TabBarView(
-          children: [_buildReportesTab(context), _buildUsuariosTab(context)],
+          children: [
+            _buildReportesTab(context),
+            const IngresosAdminTab(),
+            _buildUsuariosTab(context),
+          ],
         ),
       ),
     );
@@ -76,9 +113,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final pendientes = recogidas
             .where((r) => r.estado.toLowerCase() == 'pendiente')
             .length;
+        final ingresosTotales = recogidas
+            .where((r) => r.dineroRecibido)
+            .fold<double>(
+              0,
+              (total, recogida) => total + (recogida.montoCobrado ?? 0),
+            );
 
         final operadores = usuarios
             .where((u) => u.rol.toLowerCase() == 'operador')
+            .length;
+        final subadministradores = usuarios
+            .where((u) => u.rol.toLowerCase() == 'subadministrador')
             .length;
         final admins = usuarios
             .where((u) => u.rol.toLowerCase() == 'administrador')
@@ -100,6 +146,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 completadas,
                 enRuta,
                 pendientes,
+                ingresosTotales,
               ),
               const SizedBox(height: 32),
               Text(
@@ -107,7 +154,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 16),
-              _buildRecursosCard(context, operadores, admins, usuarios.length),
+              _buildRecursosCard(
+                context,
+                operadores,
+                subadministradores,
+                admins,
+                usuarios.length,
+              ),
               const SizedBox(height: 32),
               Text(
                 'Actividad Reciente',
@@ -152,6 +205,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     int completadas,
     int enRuta,
     int pendientes,
+    double ingresos,
   ) {
     return GridView.count(
       crossAxisCount: 2,
@@ -187,6 +241,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           pendientes.toString(),
           Icons.hourglass_empty,
           LoginovaColors.warning,
+        ),
+        _buildMetricCard(
+          context,
+          'Ingresos',
+          '\$${ingresos.toStringAsFixed(2)}',
+          Icons.payments,
+          LoginovaColors.success,
         ),
       ],
     );
@@ -244,6 +305,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget _buildRecursosCard(
     BuildContext context,
     int operadores,
+    int subadministradores,
     int admins,
     int totalUsuarios,
   ) {
@@ -258,6 +320,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             _buildRecursoRow('Administradores', admins.toString()),
             const SizedBox(height: 12),
             _buildRecursoRow('Operadores', operadores.toString()),
+            const SizedBox(height: 12),
+            _buildRecursoRow(
+              'Subadministradores',
+              subadministradores.toString(),
+            ),
           ],
         ),
       ),
@@ -348,6 +415,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 ),
                               ),
                             ),
+                            if (usuario.permisos.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: usuario.permisos
+                                    .map(
+                                      (permiso) => Chip(
+                                        label: Text(
+                                          PermissionConstants.labels[permiso] ??
+                                              permiso,
+                                        ),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ],
                           ],
                         ),
                         trailing: PopupMenuButton(
@@ -356,6 +441,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               child: const Text('Ver Detalles'),
                               onTap: () =>
                                   _mostrarDetallesUsuario(context, usuario),
+                            ),
+                            PopupMenuItem(
+                              child: const Text('Editar permisos'),
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => CrearEditarUsuarioScreen(
+                                      usuario: usuario,
+                                    ),
+                                  ),
+                                );
+
+                                if (context.mounted) {
+                                  await Provider.of<UsuariosProvider>(
+                                    context,
+                                    listen: false,
+                                  ).cargarUsuarios();
+                                }
+                              },
                             ),
                           ],
                         ),
@@ -383,6 +488,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             _buildDetailRow('Correo', usuario.correo),
             const SizedBox(height: 8),
             _buildDetailRow('Rol', usuario.rol),
+            const SizedBox(height: 8),
+            _buildDetailRow(
+              'Permisos',
+              usuario.permisos.isEmpty
+                  ? 'Sin permisos asignados'
+                  : usuario.permisos
+                        .map(
+                          (permiso) =>
+                              PermissionConstants.labels[permiso] ?? permiso,
+                        )
+                        .join(', '),
+            ),
           ],
         ),
         actions: [

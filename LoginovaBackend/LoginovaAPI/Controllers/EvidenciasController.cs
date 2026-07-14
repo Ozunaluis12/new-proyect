@@ -1,6 +1,7 @@
 using LoginovaAPI.Data;
 using LoginovaAPI.DTOs;
 using LoginovaAPI.Models;
+using LoginovaAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,10 +15,12 @@ namespace LoginovaAPI.Controllers;
 public class EvidenciasController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly EvidenciaStorageService _storageService;
 
-    public EvidenciasController(AppDbContext context)
+    public EvidenciasController(AppDbContext context, EvidenciaStorageService storageService)
     {
         _context = context;
+        _storageService = storageService;
     }
 
     /// <summary>Obtiene la lista completa de evidencias registradas en el sistema.</summary>
@@ -60,18 +63,51 @@ public class EvidenciasController : ControllerBase
     /// <param name="request">Datos de la evidencia a crear (recogida, foto, comentario).</param>
     /// <returns>La evidencia creada con su identificador.</returns>
     [HttpPost]
-    public async Task<ActionResult<Evidencia>> Create(EvidenciaRequest request)
+    public async Task<ActionResult<Evidencia>> Create([FromForm] EvidenciaUploadRequest request)
     {
+        var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;
+        if (usuarioIdClaim == 0)
+        {
+            return Forbid();
+        }
+
+        var permisosService = new PermisosService(_context);
+        if (!await permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.SubirEvidencias))
+        {
+            return Forbid();
+        }
+
         if (!await _context.Recogidas.AnyAsync(r => r.Id == request.RecogidaId))
         {
             return BadRequest(new { mensaje = "Recogida no existe" });
         }
 
+        if (request.Foto is null || request.Foto.Length == 0)
+        {
+            return BadRequest(new { mensaje = "Debes adjuntar una imagen" });
+        }
+
+        var uploadsRoot = _storageService.GetUploadsRootPath();
+        var recogidaFolder = Path.Combine(uploadsRoot, request.RecogidaId.ToString());
+        Directory.CreateDirectory(recogidaFolder);
+
+        var extension = Path.GetExtension(request.Foto.FileName);
+        var fileName = $"{Guid.NewGuid():N}{extension}";
+        var fullPath = Path.Combine(recogidaFolder, fileName);
+
+        await using (var stream = new FileStream(fullPath, FileMode.Create))
+        {
+            await request.Foto.CopyToAsync(stream);
+        }
+
+        var relativePath = _storageService.BuildRelativePath(request.RecogidaId, fileName);
+        var fotoUrl = _storageService.BuildPublicUrl(Request, relativePath);
+
         var evidencia = new Evidencia
         {
             RecogidaId = request.RecogidaId,
-            FotoUrl = request.FotoUrl,
-            Comentario = request.Comentario,
+            FotoUrl = fotoUrl,
+            Comentario = request.Comentario ?? string.Empty,
         };
 
         _context.Evidencias.Add(evidencia);
@@ -82,6 +118,7 @@ public class EvidenciasController : ControllerBase
 
     /// <summary>Elimina una evidencia por su identificador.</summary>
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Administrador")]
     public async Task<IActionResult> Delete(int id)
     {
         var evidencia = await _context.Evidencias.FindAsync(id);

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../themes/app_theme.dart';
+import '../widgets/menu_drawer.dart';
 
 /// Pantalla profesional que muestra y gestiona el perfil del usuario autenticado.
 class PerfilScreen extends StatelessWidget {
@@ -41,6 +42,7 @@ class PerfilScreen extends StatelessWidget {
     final usuario = Provider.of<AuthProvider>(context).usuario;
 
     return Scaffold(
+      drawer: const MenuDrawer(currentRoute: '/perfil'),
       appBar: AppBar(title: const Text('Mi Perfil'), elevation: 0),
       body: usuario == null
           ? _buildNoUsuario()
@@ -265,21 +267,21 @@ class PerfilScreen extends StatelessWidget {
             icon: Icons.notifications,
             title: 'Notificaciones',
             subtitle: 'Gestiona las notificaciones',
-            onTap: () {},
+            onTap: () => Navigator.pushNamed(context, '/notificaciones'),
           ),
           const Divider(height: 1),
           _buildSettingsTile(
             icon: Icons.security,
             title: 'Seguridad',
             subtitle: 'Cambiar contraseña',
-            onTap: () {},
+            onTap: () => Navigator.pushNamed(context, '/seguridad'),
           ),
           const Divider(height: 1),
           _buildSettingsTile(
             icon: Icons.info,
             title: 'Acerca de',
             subtitle: 'Versión 1.0.0',
-            onTap: () {},
+            onTap: () => Navigator.pushNamed(context, '/acerca'),
           ),
         ],
       ),

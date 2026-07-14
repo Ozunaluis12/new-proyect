@@ -49,8 +49,13 @@ new proyect/
 │       └── appsettings.json
 │
 └── 📁 scripts/                     🛠️ Scripts de utilidad
-    ├── run-all.ps1               Ejecutar frontend + backend
-    └── setup-dev.ps1             Configurar ambiente de desarrollo
+  ├── start-backend.ps1          Inicia backend local
+  ├── build-apk.ps1              Genera APK release
+  ├── run-local.ps1              Inicia backend y Flutter local
+  ├── smoke-api.ps1              Validacion API+BD
+  ├── db_persistence_check.ps1   Verifica persistencia DB
+  ├── .env.local.example.ps1     Ejemplo de configuración local
+  └── .env.local.ps1             Configuración local (no subir)
 ```
 
 ---
@@ -66,17 +71,17 @@ new proyect/
 File → Open Workspace from File → loginova.code-workspace
 ```
 
-### 2️⃣ **Configurar el Ambiente (Primera vez)**
+### 2️⃣ **Scripts de Ejecución**
 
 ```bash
-cd "c:\Users\ozuna\new proyect"
-.\scripts\setup-dev.ps1
-```
+# Iniciar backend local
+.\scripts\start-backend.ps1
 
-### 3️⃣ **Ejecutar Ambos Proyectos**
+# Generar APK release
+.\scripts\build-apk.ps1 -ApiBaseUrl http://127.0.0.1:5105/api
 
-```bash
-.\scripts\run-all.ps1
+# Ejecutar Flutter local (usa backend si no está activo)
+.\scripts\run-local.ps1 -ApiBaseUrl http://127.0.0.1:5105/api
 ```
 
 O manualmente:

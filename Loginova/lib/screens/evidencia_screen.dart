@@ -24,12 +24,34 @@ class _EvidenciaScreenState extends State<EvidenciaScreen> {
   Future<void> tomarFoto() async {
     final picker = ImagePicker();
 
-    final foto = await picker.pickImage(source: ImageSource.camera);
+    try {
+      final foto = await picker.pickImage(source: ImageSource.camera);
 
-    if (foto != null) {
-      setState(() {
-        imagen = File(foto.path);
-      });
+      if (foto != null && mounted) {
+        setState(() {
+          imagen = File(foto.path);
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+
+      try {
+        final foto = await picker.pickImage(source: ImageSource.gallery);
+
+        if (foto != null && mounted) {
+          setState(() {
+            imagen = File(foto.path);
+          });
+        }
+      } catch (_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se pudo abrir la cámara. Puedes elegir una foto desde la galería.',
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -53,13 +75,14 @@ class _EvidenciaScreenState extends State<EvidenciaScreen> {
     setState(() => guardando = true);
 
     try {
-      await EvidenciaService().guardarEvidencia(
+      final evidenciaGuardada = await EvidenciaService().guardarEvidencia(
         Evidencia(
           id: 0,
           recogidaId: widget.recogidaId!,
-          fotoUrl: imagen!.path,
+          fotoUrl: '',
           comentario: comentarioController.text.trim(),
         ),
+        foto: imagen!,
       );
 
       if (!mounted) return;
@@ -73,7 +96,7 @@ class _EvidenciaScreenState extends State<EvidenciaScreen> {
       Future.delayed(const Duration(seconds: 1), () {
         if (!mounted) return;
 
-        Navigator.pop(context, imagen!.path);
+        Navigator.pop(context, evidenciaGuardada.fotoUrl);
       });
     } catch (_) {
       if (!mounted) return;

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -23,15 +24,31 @@ class EvidenciaService {
   }
 
   /// Guarda una nueva evidencia (foto) en el servidor.
-  Future<Evidencia> guardarEvidencia(Evidencia evidencia) async {
-    final response = await http.post(
+  Future<Evidencia> guardarEvidencia(
+    Evidencia evidencia, {
+    required File foto,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
       Uri.parse('${ApiService.baseUrl}/evidencias'),
-      headers: ApiService.jsonHeaders,
-      body: jsonEncode(evidencia.toJson()),
     );
 
+    request.fields['recogidaId'] = evidencia.recogidaId.toString();
+    request.fields['comentario'] = evidencia.comentario;
+    request.files.add(await http.MultipartFile.fromPath('foto', foto.path));
+
+    final token = ApiService.token;
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
     if (response.statusCode != 201) {
-      throw Exception('No se pudo guardar la evidencia');
+      throw Exception(
+        'No se pudo guardar la evidencia (${response.statusCode}): ${response.body}',
+      );
     }
 
     return Evidencia.fromJson(jsonDecode(response.body));

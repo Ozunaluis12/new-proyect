@@ -7,6 +7,8 @@ class Recogida {
   final int cantidadPaquetes;
   final String observaciones;
   final List<String> evidencias;
+  final bool dineroRecibido;
+  final double? montoCobrado;
   final double? latitud; // Ubicación de la recogida
   final double? longitud; // Ubicación de la recogida
   final DateTime? fechaCreacion;
@@ -20,6 +22,8 @@ class Recogida {
     required this.cantidadPaquetes,
     required this.observaciones,
     required this.evidencias,
+    this.dineroRecibido = false,
+    this.montoCobrado,
     this.latitud,
     this.longitud,
     this.fechaCreacion,
@@ -35,6 +39,8 @@ class Recogida {
       cantidadPaquetes: json['cantidadPaquetes'],
       observaciones: json['observaciones'],
       evidencias: List<String>.from(json['evidencias'] ?? []),
+      dineroRecibido: json['dineroRecibido'] ?? false,
+      montoCobrado: json['montoCobrado']?.toDouble(),
       latitud: json['latitud']?.toDouble(),
       longitud: json['longitud']?.toDouble(),
       fechaCreacion: json['fechaCreacion'] != null
@@ -53,6 +59,8 @@ class Recogida {
       'cantidadPaquetes': cantidadPaquetes,
       'observaciones': observaciones,
       'evidencias': evidencias,
+      'dineroRecibido': dineroRecibido,
+      'montoCobrado': montoCobrado,
       'latitud': latitud,
       'longitud': longitud,
       'fechaCreacion': fechaCreacion?.toIso8601String(),
@@ -67,6 +75,8 @@ class Recogida {
       'estado': estado,
       'cantidadPaquetes': cantidadPaquetes,
       'observaciones': observaciones,
+      'dineroRecibido': dineroRecibido,
+      'montoCobrado': montoCobrado,
       'latitud': latitud,
       'longitud': longitud,
     };

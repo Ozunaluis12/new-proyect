@@ -4,14 +4,10 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'api_service.dart';
+import '../utils/app_logger.dart';
 
 /// Tipos de notificaciones que puede recibir la aplicación.
-enum NotificationType {
-  recogidaAsignada,
-  cambioEstado,
-  recordatorio,
-  general,
-}
+enum NotificationType { recogidaAsignada, cambioEstado, recordatorio, general }
 
 /// Datos de una notificación recibida.
 class NotificationData {
@@ -70,7 +66,7 @@ class FirebaseService {
       FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
 
       // Obtiene y envía el token FCM al backend
-      await _updateFCMToken();
+      await updateFCMToken();
 
       // Escucha cambios de token FCM
       _messaging!.onTokenRefresh.listen((newToken) {
@@ -78,10 +74,10 @@ class FirebaseService {
       });
 
       _isInitialized = true;
-      print('Firebase inicializado correctamente');
+      AppLogger.info('Firebase inicializado correctamente');
       return true;
     } catch (e) {
-      print('Error inicializando Firebase: $e');
+      AppLogger.error('Error inicializando Firebase: $e', error: e);
       return false;
     }
   }
@@ -93,17 +89,17 @@ class FirebaseService {
 
     const DarwinInitializationSettings iOSInitSettings =
         DarwinInitializationSettings(
-      requestSoundPermission: true,
-      requestBadgePermission: true,
-      requestAlertPermission: true,
-    );
+          requestSoundPermission: true,
+          requestBadgePermission: true,
+          requestAlertPermission: true,
+        );
 
     const InitializationSettings initSettings = InitializationSettings(
       android: androidInitSettings,
       iOS: iOSInitSettings,
     );
 
-    await _flutterLocalNotificationsPlugin!.initialize(initSettings);
+    await _flutterLocalNotificationsPlugin!.initialize(settings: initSettings);
   }
 
   /// Obtiene el token FCM actual del dispositivo.
@@ -112,20 +108,20 @@ class FirebaseService {
       if (_messaging == null) return null;
       return await _messaging!.getToken();
     } catch (e) {
-      print('Error obteniendo token FCM: $e');
+      AppLogger.warn('Error obteniendo token FCM: $e', error: e);
       return null;
     }
   }
 
   /// Actualiza el token FCM en el backend.
-  static Future<void> _updateFCMToken() async {
+  static Future<void> updateFCMToken() async {
     try {
       final token = await getFCMToken();
       if (token != null) {
         await _sendTokenToBackend(token);
       }
     } catch (e) {
-      print('Error actualizando token FCM: $e');
+      AppLogger.warn('Error actualizando token FCM: $e', error: e);
     }
   }
 
@@ -142,14 +138,16 @@ class FirebaseService {
 
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      print('Error enviando token al backend: $e');
+      AppLogger.warn('Error enviando token al backend: $e', error: e);
       return false;
     }
   }
 
   /// Maneja mensajes que llegan cuando la app está en foreground.
   static void _handleForegroundMessage(RemoteMessage message) {
-    print('Mensaje recibido en foreground: ${message.notification?.title}');
+    AppLogger.debug(
+      'Mensaje recibido en foreground: ${message.notification?.title}',
+    );
 
     final notifData = NotificationData(
       title: message.notification?.title ?? 'Loginova',
@@ -164,7 +162,7 @@ class FirebaseService {
 
   /// Maneja cuando el usuario toca una notificación.
   static void _handleMessageOpenedApp(RemoteMessage message) {
-    print('Notificación tocada: ${message.notification?.title}');
+    AppLogger.debug('Notificación tocada: ${message.notification?.title}');
 
     final notifData = NotificationData(
       title: message.notification?.title ?? 'Loginova',
@@ -181,15 +179,15 @@ class FirebaseService {
     try {
       const AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(
-        'loginova_channel',
-        'Notificaciones Loginova',
-        channelDescription: 'Notificaciones de recogidas y cambios de estado',
-        importance: Importance.max,
-        priority: Priority.high,
-      );
+            'loginova_channel',
+            'Notificaciones Loginova',
+            channelDescription:
+                'Notificaciones de recogidas y cambios de estado',
+            importance: Importance.max,
+            priority: Priority.high,
+          );
 
-      const DarwinNotificationDetails iOSDetails =
-          DarwinNotificationDetails(
+      const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
@@ -201,14 +199,14 @@ class FirebaseService {
       );
 
       await _flutterLocalNotificationsPlugin!.show(
-        data.hashCode,
-        data.title,
-        data.body,
-        notificationDetails,
+        id: data.hashCode,
+        title: data.title,
+        body: data.body,
+        notificationDetails: notificationDetails,
         payload: jsonEncode(data.data),
       );
     } catch (e) {
-      print('Error mostrando notificación local: $e');
+      AppLogger.warn('Error mostrando notificación local: $e', error: e);
     }
   }
 
@@ -254,7 +252,7 @@ class FirebaseService {
 
       return response.statusCode == 200;
     } catch (e) {
-      print('Error enviando notificación de prueba: $e');
+      AppLogger.warn('Error enviando notificación de prueba: $e', error: e);
       return false;
     }
   }
@@ -266,4 +264,3 @@ class FirebaseService {
     _isInitialized = false;
   }
 }
-

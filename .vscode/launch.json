@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Flutter: Launch Loginova",
+      "name": "Loginova",
       "type": "dart",
       "request": "launch",
       "program": "${workspaceFolder}/Loginova/lib/main.dart",

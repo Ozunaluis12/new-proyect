@@ -46,4 +46,7 @@ public class Cliente
 
     /// <summary>Relacion: lista de recogidas asociadas a este cliente.</summary>
     public List<Recogida> Recogidas { get; set; } = [];
+
+    /// <summary>Relacion: historial de ingresos recibidos de este cliente.</summary>
+    public List<Ingreso> Ingresos { get; set; } = [];
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/usuario.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/firebase_service.dart';
 
 /// Provider que gestiona el estado de autenticación de la aplicación.
 class AuthProvider extends ChangeNotifier {
@@ -55,6 +56,8 @@ class AuthProvider extends ChangeNotifier {
 
     _logueado = true;
     _usuario = result.usuario;
+    // Registra/actualiza el token FCM en el backend tras iniciar sesión
+    await FirebaseService.updateFCMToken();
     notifyListeners();
     return true;
   }

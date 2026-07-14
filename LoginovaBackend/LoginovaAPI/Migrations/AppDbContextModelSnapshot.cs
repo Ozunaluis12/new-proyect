@@ -192,6 +192,51 @@ namespace LoginovaAPI.Migrations
                     b.ToTable("historial_estados", (string)null);
                 });
 
+            modelBuilder.Entity("LoginovaAPI.Models.Ingreso", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ClienteId")
+                        .HasColumnType("integer")
+                        .HasColumnName("cliente_id");
+
+                    b.Property<DateTime>("FechaIngreso")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_ingreso");
+
+                    b.Property<string>("FormaPago")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("forma_pago");
+
+                    b.Property<decimal>("Monto")
+                        .HasColumnType("numeric")
+                        .HasColumnName("monto");
+
+                    b.Property<int>("RecogidaId")
+                        .HasColumnType("integer")
+                        .HasColumnName("recogida_id");
+
+                    b.Property<int>("ResponsableUsuarioId")
+                        .HasColumnType("integer")
+                        .HasColumnName("responsable_usuario_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClienteId");
+
+                    b.HasIndex("RecogidaId");
+
+                    b.HasIndex("ResponsableUsuarioId");
+
+                    b.ToTable("ingresos", (string)null);
+                });
+
             modelBuilder.Entity("LoginovaAPI.Models.Notificacion", b =>
                 {
                     b.Property<int>("Id")
@@ -260,6 +305,67 @@ namespace LoginovaAPI.Migrations
                     b.ToTable("notificaciones");
                 });
 
+            modelBuilder.Entity("LoginovaAPI.Models.Permiso", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Descripcion")
+                        .HasColumnType("text")
+                        .HasColumnName("descripcion");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("nombre");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("permisos", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Descripcion = "Crear nuevas recogidas",
+                            Nombre = "crear_recogidas"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Descripcion = "Editar recogidas existentes",
+                            Nombre = "editar_recogidas"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Descripcion = "Cambiar el estado de una recogida",
+                            Nombre = "cambiar_estado_recogidas"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Descripcion = "Subir fotos y evidencia",
+                            Nombre = "subir_evidencias"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Descripcion = "Registrar dinero cobrado",
+                            Nombre = "registrar_ingresos"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Descripcion = "Ver control de ingresos",
+                            Nombre = "ver_ingresos"
+                        });
+                });
+
             modelBuilder.Entity("LoginovaAPI.Models.Recogida", b =>
                 {
                     b.Property<int>("Id")
@@ -276,6 +382,10 @@ namespace LoginovaAPI.Migrations
                     b.Property<int>("ClienteId")
                         .HasColumnType("integer")
                         .HasColumnName("cliente_id");
+
+                    b.Property<bool>("DineroRecibido")
+                        .HasColumnType("boolean")
+                        .HasColumnName("dinero_recibido");
 
                     b.Property<string>("DireccionRecogida")
                         .IsRequired()
@@ -299,6 +409,10 @@ namespace LoginovaAPI.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fecha_recogida");
 
+                    b.Property<string>("FormaPagoUltima")
+                        .HasColumnType("text")
+                        .HasColumnName("forma_pago_ultima");
+
                     b.Property<decimal?>("Latitud")
                         .HasColumnType("numeric")
                         .HasColumnName("latitud");
@@ -306,6 +420,10 @@ namespace LoginovaAPI.Migrations
                     b.Property<decimal?>("Longitud")
                         .HasColumnType("numeric")
                         .HasColumnName("longitud");
+
+                    b.Property<decimal?>("MontoCobrado")
+                        .HasColumnType("numeric")
+                        .HasColumnName("monto_cobrado");
 
                     b.Property<string>("Observaciones")
                         .HasColumnType("text")
@@ -364,6 +482,12 @@ namespace LoginovaAPI.Migrations
                             Id = 3,
                             Descripcion = "Consulta servicios",
                             Nombre = "Cliente"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Descripcion = "Gestiona operaciones con permisos limitados",
+                            Nombre = "Subadministrador"
                         });
                 });
 
@@ -439,6 +563,11 @@ namespace LoginovaAPI.Migrations
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("PermisosJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("permisos_json");
+
                     b.Property<int>("RoleId")
                         .HasColumnType("integer")
                         .HasColumnName("rol_id");
@@ -462,9 +591,10 @@ namespace LoginovaAPI.Migrations
                             Id = 1,
                             Activo = true,
                             Correo = "admin@loginova.com",
-                            FechaCreacion = new DateTime(2026, 6, 22, 18, 13, 39, 355, DateTimeKind.Utc).AddTicks(9464),
+                            FechaCreacion = new DateTime(2026, 7, 4, 1, 45, 8, 78, DateTimeKind.Utc).AddTicks(5873),
                             Nombre = "Administrador",
-                            Password = "pbkdf2$100000$8KVhKwTlVDO3W4/ZLPOHuw==$qnCn17JEoRpmnW5mpFhwxKVI0kK1bbl5m3FYZOiRwZ4=",
+                            Password = "pbkdf2$100000$Mz5H5D/HLBMh8XJpehefgg==$oHa6c+5jiazyNL+1zbvpvCdxS1xssd0yi1JSLFwh3nU=",
+                            PermisosJson = "[]",
                             RoleId = 1
                         });
                 });
@@ -496,6 +626,33 @@ namespace LoginovaAPI.Migrations
                     b.Navigation("Recogida");
 
                     b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("LoginovaAPI.Models.Ingreso", b =>
+                {
+                    b.HasOne("LoginovaAPI.Models.Cliente", "Cliente")
+                        .WithMany("Ingresos")
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LoginovaAPI.Models.Recogida", "Recogida")
+                        .WithMany("Ingresos")
+                        .HasForeignKey("RecogidaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LoginovaAPI.Models.Usuario", "ResponsableUsuario")
+                        .WithMany("IngresosRecibidos")
+                        .HasForeignKey("ResponsableUsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Cliente");
+
+                    b.Navigation("Recogida");
+
+                    b.Navigation("ResponsableUsuario");
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.Notificacion", b =>
@@ -551,6 +708,8 @@ namespace LoginovaAPI.Migrations
 
             modelBuilder.Entity("LoginovaAPI.Models.Cliente", b =>
                 {
+                    b.Navigation("Ingresos");
+
                     b.Navigation("Recogidas");
                 });
 
@@ -559,6 +718,8 @@ namespace LoginovaAPI.Migrations
                     b.Navigation("Evidencias");
 
                     b.Navigation("HistorialEstados");
+
+                    b.Navigation("Ingresos");
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.Role", b =>
@@ -569,6 +730,8 @@ namespace LoginovaAPI.Migrations
             modelBuilder.Entity("LoginovaAPI.Models.Usuario", b =>
                 {
                     b.Navigation("HistorialEstados");
+
+                    b.Navigation("IngresosRecibidos");
 
                     b.Navigation("Recogidas");
 

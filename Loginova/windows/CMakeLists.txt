@@ -1,5 +1,10 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
+
+# CMake 4 elimina compatibilidad con politicas muy antiguas usadas por
+# dependencias de terceros (por ejemplo, firebase_cpp_sdk_windows).
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
 project(loginova LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
@@ -65,9 +70,9 @@ include(flutter/generated_plugins.cmake)
 set(BUILD_BUNDLE_DIR "$<TARGET_FILE_DIR:${BINARY_NAME}>")
 # Make the "install" step default, as it's required to run.
 set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
-endif()
+# Fuerza instalación local en carpeta de build para evitar permisos de admin
+# cuando VS/CMake inicializa el prefijo en Program Files.
+set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")

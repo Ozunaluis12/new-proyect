@@ -17,16 +17,33 @@ namespace LoginovaAPI.Controllers;
 /// </summary>
 public class RecogidasController : ControllerBase
 {
+    private static readonly HashSet<string> FormasPagoPermitidas = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Efectivo",
+        "Transferencia",
+    };
+
+    private static readonly HashSet<string> EstadosOperadorPermitidos = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Pendiente",
+        "Recogida",
+        "Cancelada",
+    };
+
     private readonly AppDbContext _context;
     private readonly AuditoriaService _auditoria;
+    private readonly EvidenciaStorageService _storageService;
+    private readonly NotificacionService _notificacionService;
 
     /// <summary>
     /// Constructor que recibe el contexto de datos y servicio de auditoría.
     /// </summary>
-    public RecogidasController(AppDbContext context, AuditoriaService auditoria)
+    public RecogidasController(AppDbContext context, AuditoriaService auditoria, EvidenciaStorageService storageService, NotificacionService notificacionService)
     {
         _context = context;
         _auditoria = auditoria;
+        _storageService = storageService;
+        _notificacionService = notificacionService;
     }
 
     [HttpGet]
@@ -63,6 +80,17 @@ public class RecogidasController : ControllerBase
     /// </summary>
     public async Task<ActionResult<RecogidaResponse>> Create(RecogidaRequest request)
     {
+        if (!await PuedeGestionarAsync(PermisosCatalogo.CrearRecogidas))
+        {
+            return Forbid();
+        }
+
+        if ((request.DineroRecibido || request.MontoCobrado.GetValueOrDefault() > 0m) &&
+            !await PuedeGestionarAsync(PermisosCatalogo.RegistrarIngresos))
+        {
+            return Forbid();
+        }
+
         if (!await _context.Clientes.AnyAsync(c => c.Id == request.ClienteId))
         {
             return BadRequest(new { mensaje = "Cliente no existe" });
@@ -82,6 +110,8 @@ public class RecogidasController : ControllerBase
             Observaciones = request.Observaciones,
             Latitud = request.Latitud,
             Longitud = request.Longitud,
+            DineroRecibido = request.DineroRecibido,
+            MontoCobrado = request.MontoCobrado,
         };
 
         _context.Recogidas.Add(recogida);
@@ -95,10 +125,22 @@ public class RecogidasController : ControllerBase
             recogida.Id,
             "CREATE",
             null,
-            new { recogida.ClienteId, recogida.UsuarioId, recogida.Estado, recogida.CantidadPaquetes, recogida.Observaciones, recogida.Latitud, recogida.Longitud },
+            new { recogida.ClienteId, recogida.UsuarioId, recogida.Estado, recogida.CantidadPaquetes, recogida.Observaciones, recogida.Latitud, recogida.Longitud, recogida.DineroRecibido, recogida.MontoCobrado },
             $"Nueva recogida creada para cliente #{recogida.ClienteId}",
             HttpContext.Connection.RemoteIpAddress?.ToString()
         );
+
+        await _notificacionService.EnviarNotificacionAUsuariosOperativosAsync(
+            "Nueva recogida creada",
+            $"Se registró una nueva recogida #{recogida.Id} para el cliente #{recogida.ClienteId}.",
+            "nueva_recogida",
+            recogida.Id,
+            new Dictionary<string, string>
+            {
+                ["evento"] = "nueva_recogida",
+                ["clienteId"] = recogida.ClienteId.ToString(),
+            },
+            usuarioIdClaim > 0 ? usuarioIdClaim : null);
 
         return CreatedAtAction(nameof(GetById), new { id = recogida.Id }, ToResponse(recogida));
     }
@@ -109,6 +151,17 @@ public class RecogidasController : ControllerBase
     /// </summary>
     public async Task<IActionResult> Update(int id, RecogidaRequest request)
     {
+        if (!await PuedeGestionarAsync(PermisosCatalogo.EditarRecogidas))
+        {
+            return Forbid();
+        }
+
+        if ((request.DineroRecibido || request.MontoCobrado.GetValueOrDefault() > 0m) &&
+            !await PuedeGestionarAsync(PermisosCatalogo.RegistrarIngresos))
+        {
+            return Forbid();
+        }
+
         var recogida = await _context.Recogidas.FindAsync(id);
         if (recogida is null)
         {
@@ -135,6 +188,8 @@ public class RecogidasController : ControllerBase
             recogida.Observaciones,
             recogida.Latitud,
             recogida.Longitud,
+            recogida.DineroRecibido,
+            recogida.MontoCobrado,
         };
 
         recogida.ClienteId = request.ClienteId;
@@ -144,6 +199,8 @@ public class RecogidasController : ControllerBase
         recogida.Observaciones = request.Observaciones;
         recogida.Latitud = request.Latitud;
         recogida.Longitud = request.Longitud;
+        recogida.DineroRecibido = request.DineroRecibido;
+        recogida.MontoCobrado = request.MontoCobrado;
 
         await _context.SaveChangesAsync();
 
@@ -155,7 +212,7 @@ public class RecogidasController : ControllerBase
             recogida.Id,
             "UPDATE",
             valoresAnteriores,
-            new { recogida.ClienteId, recogida.UsuarioId, recogida.Estado, recogida.CantidadPaquetes, recogida.Observaciones, recogida.Latitud, recogida.Longitud },
+            new { recogida.ClienteId, recogida.UsuarioId, recogida.Estado, recogida.CantidadPaquetes, recogida.Observaciones, recogida.Latitud, recogida.Longitud, recogida.DineroRecibido, recogida.MontoCobrado },
             $"Recogida #{recogida.Id} actualizada",
             HttpContext.Connection.RemoteIpAddress?.ToString()
         );
@@ -163,7 +220,167 @@ public class RecogidasController : ControllerBase
         return NoContent();
     }
 
+    [HttpPut("{id:int}/estado")]
+    /// <summary>
+    /// Actualiza solo el estado de una recogida y registra evidencia asociada.
+    /// </summary>
+    public async Task<ActionResult<RecogidaResponse>> UpdateEstado(int id, [FromForm] ActualizarEstadoRecogidaRequest request)
+    {
+        if (!await PuedeGestionarAsync(PermisosCatalogo.CambiarEstadoRecogidas))
+        {
+            return Forbid();
+        }
+
+        if (!EstadosOperadorPermitidos.Contains(request.Estado))
+        {
+            return BadRequest(new { mensaje = "Estado no permitido para el operador" });
+        }
+
+        if ((request.DineroRecibido || request.MontoCobrado.GetValueOrDefault() > 0m) &&
+            !await PuedeGestionarAsync(PermisosCatalogo.RegistrarIngresos))
+        {
+            return Forbid();
+        }
+
+        if (request.DineroRecibido)
+        {
+            if (!string.Equals(request.Estado, "Recogida", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { mensaje = "Solo se puede registrar dinero al completar la recogida" });
+            }
+
+            if (request.MontoCobrado.GetValueOrDefault() <= 0m)
+            {
+                return BadRequest(new { mensaje = "Debes indicar un monto válido" });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.FormaPago) || !FormasPagoPermitidas.Contains(request.FormaPago))
+            {
+                return BadRequest(new { mensaje = "La forma de pago debe ser Efectivo o Transferencia" });
+            }
+        }
+
+        if ((!string.IsNullOrWhiteSpace(request.FotoUrl) || !string.IsNullOrWhiteSpace(request.Comentario)) &&
+            !await PuedeGestionarAsync(PermisosCatalogo.SubirEvidencias))
+        {
+            return Forbid();
+        }
+
+        var recogida = await _context.Recogidas
+            .Include(item => item.Evidencias)
+            .SingleOrDefaultAsync(item => item.Id == id);
+
+        if (recogida is null)
+        {
+            return NotFound();
+        }
+
+        var estadoAnterior = recogida.Estado;
+        recogida.Estado = request.Estado;
+        recogida.DineroRecibido = request.DineroRecibido;
+        recogida.MontoCobrado = request.MontoCobrado;
+        recogida.FormaPagoUltima = request.DineroRecibido ? request.FormaPago : null;
+
+        if (string.Equals(request.Estado, "Recogida", StringComparison.OrdinalIgnoreCase))
+        {
+            recogida.FechaRecogida ??= DateTime.UtcNow;
+        }
+
+        string? fotoUrl = null;
+        if (request.Foto is not null && request.Foto.Length > 0)
+        {
+            var uploadsRoot = _storageService.GetUploadsRootPath();
+            var recogidaFolder = Path.Combine(uploadsRoot, recogida.Id.ToString());
+            Directory.CreateDirectory(recogidaFolder);
+
+            var extension = Path.GetExtension(request.Foto.FileName);
+            var fileName = $"{Guid.NewGuid():N}{extension}";
+            var fullPath = Path.Combine(recogidaFolder, fileName);
+
+            await using (var stream = new FileStream(fullPath, FileMode.Create))
+            {
+                await request.Foto.CopyToAsync(stream);
+            }
+
+            fotoUrl = _storageService.BuildPublicUrl(Request, _storageService.BuildRelativePath(recogida.Id, fileName));
+        }
+        else if (!string.IsNullOrWhiteSpace(request.FotoUrl))
+        {
+            fotoUrl = request.FotoUrl;
+        }
+
+        if (!string.IsNullOrWhiteSpace(fotoUrl))
+        {
+            _context.Evidencias.Add(new Evidencia
+            {
+                RecogidaId = recogida.Id,
+                FotoUrl = fotoUrl,
+                Comentario = request.Comentario ?? string.Empty,
+            });
+        }
+
+        var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;
+        _context.HistorialEstados.Add(new HistorialEstado
+        {
+            RecogidaId = recogida.Id,
+            EstadoAnterior = estadoAnterior,
+            EstadoNuevo = request.Estado,
+            UsuarioId = usuarioIdClaim > 0 ? usuarioIdClaim : null,
+        });
+
+        if (request.DineroRecibido && usuarioIdClaim > 0)
+        {
+            _context.Ingresos.Add(new Ingreso
+            {
+                RecogidaId = recogida.Id,
+                ClienteId = recogida.ClienteId,
+                ResponsableUsuarioId = usuarioIdClaim,
+                Monto = request.MontoCobrado ?? 0m,
+                FormaPago = request.FormaPago ?? "Efectivo",
+                FechaIngreso = DateTime.UtcNow,
+            });
+        }
+
+        await _context.SaveChangesAsync();
+
+        if (request.DineroRecibido)
+        {
+            await _notificacionService.EnviarNotificacionAUsuariosConPermisoAsync(
+                PermisosCatalogo.VerIngresos,
+                "Dinero recibido",
+                $"Se registró dinero en la recogida #{recogida.Id} por un total de {request.MontoCobrado?.ToString("0.00") ?? "0.00"}.",
+                "dinero_recibido",
+                recogida.Id,
+                new Dictionary<string, string>
+                {
+                    ["evento"] = "dinero_recibido",
+                    ["monto"] = (request.MontoCobrado ?? 0m).ToString("0.00"),
+                },
+                usuarioIdClaim > 0 ? usuarioIdClaim : null);
+        }
+
+        await _notificacionService.EnviarNotificacionAUsuariosOperativosAsync(
+            "Cambio de estado de recogida",
+            $"La recogida #{recogida.Id} cambió a {request.Estado}.",
+            "cambio_estado",
+            recogida.Id,
+            new Dictionary<string, string>
+            {
+                ["evento"] = "cambio_estado",
+                ["estado"] = request.Estado,
+            },
+            usuarioIdClaim > 0 ? usuarioIdClaim : null);
+
+        var actualizada = await _context.Recogidas
+            .AsNoTracking()
+            .Include(item => item.Evidencias)
+            .SingleAsync(item => item.Id == id);
+
+        return Ok(ToResponse(actualizada));
+    }
+
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Administrador")]
     /// <summary>
     /// Elimina una recogida por su identificador.
     /// </summary>
@@ -220,6 +437,19 @@ public class RecogidasController : ControllerBase
             recogida.Evidencias.Select(evidencia => evidencia.FotoUrl).ToList(),
             recogida.Latitud,
             recogida.Longitud,
+            recogida.DineroRecibido,
+            recogida.MontoCobrado,
             recogida.FechaCreacion);
+    }
+
+    private async Task<bool> PuedeGestionarAsync(string permiso)
+    {
+        var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;
+        if (usuarioIdClaim == 0)
+        {
+            return false;
+        }
+
+        return await new PermisosService(_context).TienePermisoAsync(usuarioIdClaim, permiso);
     }
 }

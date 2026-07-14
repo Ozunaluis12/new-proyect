@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../constants/permission_constants.dart';
 import '../models/recogida.dart';
+import '../providers/auth_provider.dart';
 import '../providers/recogida_provider.dart';
 import '../themes/app_theme.dart';
+import '../widgets/menu_drawer.dart';
 import 'crear_recogida_screen.dart';
+import 'cambiar_estado_recogida_screen.dart';
 import 'detalle_recogida_screen.dart';
 import 'editar_recogida_screen.dart';
 
@@ -18,7 +22,14 @@ class RecogidasScreen extends StatefulWidget {
 
 class _RecogidasScreenState extends State<RecogidasScreen> {
   String _filtroEstado = 'Todos';
-  final List<String> _estados = ['Todos', 'Pendiente', 'Asignada', 'En Ruta', 'Recogida', 'Cancelada'];
+  final List<String> _estados = [
+    'Todos',
+    'Pendiente',
+    'Asignada',
+    'En Ruta',
+    'Recogida',
+    'Cancelada',
+  ];
 
   @override
   void initState() {
@@ -38,8 +49,10 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
 
     if (!mounted) return;
 
-    await Provider.of<RecogidaProvider>(context, listen: false)
-        .cargarRecogidas();
+    await Provider.of<RecogidaProvider>(
+      context,
+      listen: false,
+    ).cargarRecogidas();
   }
 
   /// Filtra las recogidas según el estado seleccionado
@@ -90,19 +103,23 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final usuario = Provider.of<AuthProvider>(context).usuario;
+    final puedeCrearRecogidas =
+        usuario?.tienePermiso(PermissionConstants.crearRecogidas) ?? false;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recogidas'),
-        elevation: 0,
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const CrearRecogidaScreen()),
-        ),
-        icon: const Icon(Icons.add),
-        label: const Text('Nueva'),
-      ),
+      drawer: const MenuDrawer(currentRoute: '/recogidas'),
+      appBar: AppBar(title: const Text('Recogidas'), elevation: 0),
+      floatingActionButton: puedeCrearRecogidas
+          ? FloatingActionButton.extended(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CrearRecogidaScreen()),
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('Nueva'),
+            )
+          : null,
       body: Consumer<RecogidaProvider>(
         builder: (context, provider, _) {
           final recogidas = _filtrarRecogidas(provider.recogidas);
@@ -117,25 +134,25 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
                 child: provider.cargando
                     ? const Center(child: CircularProgressIndicator())
                     : recogidas.isEmpty
-                        ? _buildEmptyState()
-                        : RefreshIndicator(
-                            onRefresh: provider.cargarRecogidas,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                              itemCount: recogidas.length,
-                              itemBuilder: (context, index) {
-                                final recogida = recogidas[index];
-                                return _buildRecogidaCard(
-                                  context,
-                                  recogida,
-                                  provider,
-                                );
-                              },
-                            ),
+                    ? _buildEmptyState()
+                    : RefreshIndicator(
+                        onRefresh: provider.cargarRecogidas,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
                           ),
+                          itemCount: recogidas.length,
+                          itemBuilder: (context, index) {
+                            final recogida = recogidas[index];
+                            return _buildRecogidaCard(
+                              context,
+                              recogida,
+                              provider,
+                            );
+                          },
+                        ),
+                      ),
               ),
             ],
           );
@@ -151,16 +168,18 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       child: Row(
         children: _estados
-            .map((estado) => Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text(estado),
-                selected: _filtroEstado == estado,
-                onSelected: (selected) {
-                  setState(() => _filtroEstado = estado);
-                },
+            .map(
+              (estado) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: Text(estado),
+                  selected: _filtroEstado == estado,
+                  onSelected: (selected) {
+                    setState(() => _filtroEstado = estado);
+                  },
+                ),
               ),
-            ))
+            )
             .toList(),
       ),
     );
@@ -172,6 +191,13 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
     Recogida recogida,
     RecogidaProvider provider,
   ) {
+    final usuario = Provider.of<AuthProvider>(context).usuario;
+    final puedeEditar =
+        usuario?.tienePermiso(PermissionConstants.editarRecogidas) ?? false;
+    final puedeCambiarEstado =
+        usuario?.tienePermiso(PermissionConstants.cambiarEstadoRecogidas) ??
+        false;
+
     final color = _getEstadoColor(recogida.estado);
     final icon = _getEstadoIcon(recogida.estado);
 
@@ -194,10 +220,8 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
                       children: [
                         Text(
                           'Recogida #${recogida.id}',
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -208,8 +232,10 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
                     ),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.1),
                       border: Border.all(color: color),
@@ -270,8 +296,8 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: LoginovaColors.textSecondary,
-                            ),
+                          color: LoginovaColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -289,29 +315,47 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
                     label: const Text('Ver'),
                   ),
                   const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => EditarRecogidaScreen(recogida: recogida),
+                  if (puedeEditar) ...[
+                    TextButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              EditarRecogidaScreen(recogida: recogida),
+                        ),
+                      ),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Editar'),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: () =>
+                          _showDeleteDialog(context, recogida.id, provider),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Eliminar'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: LoginovaColors.error,
                       ),
                     ),
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Editar'),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: () => _showDeleteDialog(
-                      context,
-                      recogida.id,
-                      provider,
+                  ] else if (puedeCambiarEstado) ...[
+                    TextButton.icon(
+                      onPressed: () async {
+                        final actualizada = await Navigator.push<Recogida>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                CambiarEstadoRecogidaScreen(recogida: recogida),
+                          ),
+                        );
+
+                        if (actualizada != null && context.mounted) {
+                          await provider.cargarRecogidas();
+                        }
+                      },
+                      icon: const Icon(Icons.fact_check_outlined),
+                      label: const Text('Estado'),
                     ),
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('Eliminar'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: LoginovaColors.error,
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ],
@@ -336,15 +380,15 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
           Text(
             'No hay recogidas',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: LoginovaColors.textSecondary,
-                ),
+              color: LoginovaColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Crea una nueva recogida para comenzar',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: LoginovaColors.textSecondary,
-                ),
+              color: LoginovaColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(

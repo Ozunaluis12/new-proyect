@@ -9,7 +9,27 @@ public record RecogidaRequest(
     [Range(0, int.MaxValue)] int CantidadPaquetes,
     string? Observaciones,
     decimal? Latitud,
-    decimal? Longitud);
+    decimal? Longitud,
+    bool DineroRecibido,
+    decimal? MontoCobrado);
+
+public class ActualizarEstadoRecogidaRequest
+{
+    [Required]
+    public string Estado { get; set; } = string.Empty;
+
+    public string? FotoUrl { get; set; }
+
+    public string? Comentario { get; set; }
+
+    public bool DineroRecibido { get; set; }
+
+    public decimal? MontoCobrado { get; set; }
+
+    public string? FormaPago { get; set; }
+
+    public IFormFile? Foto { get; set; }
+}
 
 public record RecogidaResponse(
     int Id,
@@ -21,4 +41,6 @@ public record RecogidaResponse(
     List<string> Evidencias,
     decimal? Latitud,
     decimal? Longitud,
+    bool DineroRecibido,
+    decimal? MontoCobrado,
     DateTime? FechaCreacion);

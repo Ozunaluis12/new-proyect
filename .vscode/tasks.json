@@ -47,14 +47,38 @@
       "problemMatcher": []
     },
     {
-      "label": "Loginova: Run All",
+      "label": "Scripts: Start Backend",
       "type": "shell",
       "command": "powershell",
       "args": [
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "${workspaceFolder}/scripts/run-all.ps1"
+        "${workspaceFolder}/scripts/start-backend.ps1"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Scripts: Build APK",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/build-apk.ps1"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Scripts: Run Local",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/scripts/run-local.ps1"
       ],
       "problemMatcher": []
     }

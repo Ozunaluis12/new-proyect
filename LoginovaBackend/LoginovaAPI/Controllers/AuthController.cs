@@ -65,7 +65,7 @@ public class AuthController : ControllerBase
             return Conflict(new { mensaje = "El correo ya esta registrado" });
         }
 
-        var roleName = "Operador";
+        var roleName = "Cliente";
         var role = await _context.Roles.SingleOrDefaultAsync(r => r.Nombre == roleName);
         if (role is null)
         {
@@ -78,6 +78,7 @@ public class AuthController : ControllerBase
             Correo = request.Correo,
             Password = _passwordHasher.Hash(request.Password),
             RoleId = role.Id,
+            PermisosJson = "[]",
         };
 
         _context.Usuarios.Add(usuario);
@@ -108,6 +109,6 @@ public class AuthController : ControllerBase
     {
         return new AuthResponse(
             _jwtTokenService.CreateToken(usuario),
-            new UsuarioResponse(usuario.Id, usuario.Nombre, usuario.Correo, usuario.Rol));
+            new UsuarioResponse(usuario.Id, usuario.Nombre, usuario.Correo, usuario.Rol, usuario.Permisos));
     }
 }

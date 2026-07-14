@@ -1,6 +1,7 @@
 using LoginovaAPI.Data;
 using LoginovaAPI.DTOs;
 using LoginovaAPI.Models;
+using Google.Apis.Auth.OAuth2;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -16,6 +17,7 @@ public class NotificacionService
     private readonly IConfiguration _configuration;
 
     private const string FCMUrl = "https://fcm.googleapis.com/v1/projects/{0}/messages:send";
+    private const string FirebaseMessagingScope = "https://www.googleapis.com/auth/firebase.messaging";
 
     public NotificacionService(AppDbContext context, IConfiguration configuration)
     {
@@ -131,13 +133,28 @@ public class NotificacionService
         List<int> usuarioIds, 
         string titulo, 
         string cuerpo, 
-        string tipo = "general")
+        string tipo = "general",
+        int? recogidaId = null,
+        Dictionary<string, string>? datosAdicionales = null,
+        int? excluirUsuarioId = null)
     {
         var enviadas = 0;
 
         foreach (var usuarioId in usuarioIds)
         {
-            var request = new NotificacionRequest(usuarioId, titulo, cuerpo, tipo);
+            if (excluirUsuarioId.HasValue && usuarioId == excluirUsuarioId.Value)
+            {
+                continue;
+            }
+
+            var request = new NotificacionRequest(
+                usuarioId,
+                titulo,
+                cuerpo,
+                tipo,
+                recogidaId,
+                datosAdicionales);
+
             if (await EnviarNotificacion(request))
             {
                 enviadas++;
@@ -147,6 +164,79 @@ public class NotificacionService
         return enviadas;
     }
 
+    public async Task<List<int>> ObtenerUsuariosOperativosAsync(int? excluirUsuarioId = null)
+    {
+        var usuarios = await _context.Usuarios
+            .AsNoTracking()
+            .Include(usuario => usuario.Role)
+            .Where(usuario => usuario.Role != null &&
+                (usuario.Role.Nombre == "Administrador" || usuario.Role.Nombre == "Subadministrador" || usuario.Role.Nombre == "Operador"))
+            .Select(usuario => usuario.Id)
+            .ToListAsync();
+
+        if (excluirUsuarioId.HasValue)
+        {
+            usuarios = usuarios.Where(id => id != excluirUsuarioId.Value).ToList();
+        }
+
+        return usuarios;
+    }
+
+    public async Task<List<int>> ObtenerUsuariosConPermisoAsync(string permiso, int? excluirUsuarioId = null)
+    {
+        var usuarios = await _context.Usuarios
+            .AsNoTracking()
+            .Where(usuario => usuario.Permisos.Any(item => string.Equals(item, permiso, StringComparison.OrdinalIgnoreCase)))
+            .Select(usuario => usuario.Id)
+            .ToListAsync();
+
+        if (excluirUsuarioId.HasValue)
+        {
+            usuarios = usuarios.Where(id => id != excluirUsuarioId.Value).ToList();
+        }
+
+        return usuarios;
+    }
+
+    public async Task<int> EnviarNotificacionAUsuariosOperativosAsync(
+        string titulo,
+        string cuerpo,
+        string tipo,
+        int? recogidaId = null,
+        Dictionary<string, string>? datosAdicionales = null,
+        int? excluirUsuarioId = null)
+    {
+        var usuarios = await ObtenerUsuariosOperativosAsync(excluirUsuarioId);
+        return await EnviarNotificacionMasiva(
+            usuarios,
+            titulo,
+            cuerpo,
+            tipo,
+            recogidaId,
+            datosAdicionales,
+            excluirUsuarioId);
+    }
+
+    public async Task<int> EnviarNotificacionAUsuariosConPermisoAsync(
+        string permiso,
+        string titulo,
+        string cuerpo,
+        string tipo,
+        int? recogidaId = null,
+        Dictionary<string, string>? datosAdicionales = null,
+        int? excluirUsuarioId = null)
+    {
+        var usuarios = await ObtenerUsuariosConPermisoAsync(permiso, excluirUsuarioId);
+        return await EnviarNotificacionMasiva(
+            usuarios,
+            titulo,
+            cuerpo,
+            tipo,
+            recogidaId,
+            datosAdicionales,
+            excluirUsuarioId);
+    }
+
     /// <summary>
     /// Envía la notificación real a través de Firebase Cloud Messaging.
     /// </summary>
@@ -154,14 +244,21 @@ public class NotificacionService
     {
         try
         {
-            var projectId = _configuration["Firebase:ProjectId"];
-            if (string.IsNullOrEmpty(projectId))
+            var credential = ObtenerFirebaseCredential();
+            if (credential == null)
             {
-                Console.WriteLine("Firebase ProjectId no configurado");
+                Console.WriteLine("Firebase credential no configurada. Define Firebase:ServiceAccountPath, Firebase:ServiceAccountJson o GOOGLE_APPLICATION_CREDENTIALS.");
                 return false;
             }
 
-            var accessToken = await ObtenerAccessTokenFirebase();
+            var projectId = ObtenerFirebaseProjectId(credential);
+            if (string.IsNullOrWhiteSpace(projectId))
+            {
+                Console.WriteLine("Firebase ProjectId no configurado. Define Firebase:ProjectId o usa una service account con project_id.");
+                return false;
+            }
+
+            var accessToken = await ObtenerAccessTokenFirebase(credential);
             if (string.IsNullOrEmpty(accessToken))
             {
                 return false;
@@ -198,6 +295,12 @@ public class NotificacionService
                 string.Format(FCMUrl, projectId),
                 contenido);
 
+            if (!response.IsSuccessStatusCode)
+            {
+                var detalle = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"FCM respondió {(int)response.StatusCode}: {detalle}");
+            }
+
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -208,21 +311,85 @@ public class NotificacionService
     }
 
     /// <summary>
-    /// Obtiene el access token para Firebase (desde archivo de configuración).
-    /// NOTA: En producción, implementar OAuth2 properly.
+    /// Obtiene el access token OAuth2 para Firebase Cloud Messaging.
     /// </summary>
-    private async Task<string?> ObtenerAccessTokenFirebase()
+    private static async Task<string?> ObtenerAccessTokenFirebase(GoogleCredential credential)
     {
         try
         {
-            // TODO: Implementar obtención real del access token
-            // Por ahora, retorna null como placeholder
-            return null;
+            var scopedCredential = credential.IsCreateScopedRequired
+                ? credential.CreateScoped(FirebaseMessagingScope)
+                : credential;
+
+            return await scopedCredential.UnderlyingCredential.GetAccessTokenForRequestAsync();
         }
         catch
         {
             return null;
         }
+    }
+
+    private GoogleCredential? ObtenerFirebaseCredential()
+    {
+        var serviceAccountJson = ObtenerServiceAccountJson();
+        if (!string.IsNullOrWhiteSpace(serviceAccountJson))
+        {
+            return GoogleCredential.FromJson(serviceAccountJson);
+        }
+
+        return null;
+    }
+
+    private string? ObtenerFirebaseProjectId(GoogleCredential credential)
+    {
+        var configuredProjectId = _configuration["Firebase:ProjectId"];
+        if (!string.IsNullOrWhiteSpace(configuredProjectId))
+        {
+            return configuredProjectId;
+        }
+
+        var serviceAccountJson = ObtenerServiceAccountJson();
+        if (string.IsNullOrWhiteSpace(serviceAccountJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(serviceAccountJson);
+            if (document.RootElement.TryGetProperty("project_id", out var projectId))
+            {
+                return projectId.GetString();
+            }
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        return null;
+    }
+
+    private string? ObtenerServiceAccountJson()
+    {
+        var serviceAccountJson = _configuration["Firebase:ServiceAccountJson"];
+        if (!string.IsNullOrWhiteSpace(serviceAccountJson))
+        {
+            return serviceAccountJson;
+        }
+
+        var serviceAccountPath = _configuration["Firebase:ServiceAccountPath"];
+        if (string.IsNullOrWhiteSpace(serviceAccountPath))
+        {
+            serviceAccountPath = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+        }
+
+        if (!string.IsNullOrWhiteSpace(serviceAccountPath) && File.Exists(serviceAccountPath))
+        {
+            return File.ReadAllText(serviceAccountPath);
+        }
+
+        return null;
     }
 
     /// <summary>

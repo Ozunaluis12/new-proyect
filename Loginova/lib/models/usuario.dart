@@ -4,6 +4,7 @@ class Usuario {
   final String nombre;
   final String correo;
   final String rol;
+  final List<String> permisos;
 
   /// Constructor que requiere todos los campos.
   Usuario({
@@ -11,6 +12,7 @@ class Usuario {
     required this.nombre,
     required this.correo,
     required this.rol,
+    required this.permisos,
   });
 
   /// Crea una instancia de Usuario desde un JSON devuelto por el servidor.
@@ -20,11 +22,26 @@ class Usuario {
       nombre: json['nombre'],
       correo: json['correo'],
       rol: json['rol'] ?? '',
+      permisos: List<String>.from(json['permisos'] ?? const []),
     );
   }
 
   /// Convierte el usuario a un mapa JSON para enviar al servidor.
   Map<String, dynamic> toJson() {
-    return {'id': id, 'nombre': nombre, 'correo': correo, 'rol': rol};
+    return {
+      'id': id,
+      'nombre': nombre,
+      'correo': correo,
+      'rol': rol,
+      'permisos': permisos,
+    };
+  }
+
+  bool tienePermiso(String permiso) {
+    if (rol.toLowerCase() == 'administrador') {
+      return true;
+    }
+
+    return permisos.any((item) => item.toLowerCase() == permiso.toLowerCase());
   }
 }

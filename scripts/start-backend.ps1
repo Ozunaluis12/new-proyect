@@ -1,63 +1,70 @@
 param(
-    [switch]$LaunchApp
+    [string]$EnvFile = '.env.local.ps1',
+    [string]$BackendProject = '..\LoginovaBackend\LoginovaAPI',
+    [string]$BackendUrl = 'http://0.0.0.0:5105',
+    [switch]$Restore
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$backendPath = Resolve-Path -Path (Join-Path $scriptRoot $BackendProject)
+$healthUrl = 'http://127.0.0.1:5105/health'
 
-$rootPath = Split-Path -Parent $PSScriptRoot
-$backendPath = Join-Path $rootPath 'LoginovaBackend\LoginovaAPI'
-$backendUrl = 'http://0.0.0.0:5105'
+function Load-LocalEnv {
+    param([string]$Path)
 
-function Get-LocalIPv4Address {
-    if (-not (Get-Command Get-NetIPAddress -ErrorAction SilentlyContinue)) {
-        return $null
+    $resolvedPath = if ([System.IO.Path]::IsPathRooted($Path)) {
+        $Path
+    } else {
+        Join-Path $scriptRoot $Path
     }
 
-    $candidate = Get-NetIPAddress -AddressFamily IPv4 |
-        Where-Object {
-            $_.IPAddress -ne '127.0.0.1' -and
-            $_.IPAddress -notlike '169.254*' -and
-            $_.InterfaceOperationalStatus -eq 'Up'
-        } |
-        Select-Object -First 1
-
-    if ($null -eq $candidate) {
-        return $null
+    if (-not [string]::IsNullOrWhiteSpace($resolvedPath) -and (Test-Path $resolvedPath)) {
+        Write-Host "Cargando configuración local desde: $resolvedPath" -ForegroundColor Cyan
+        . $resolvedPath
+    } else {
+        Write-Host "No se encontró el archivo de entorno: $resolvedPath" -ForegroundColor Yellow
     }
-
-    return $candidate.IPAddress
 }
 
-if (-not (Test-Path $backendPath)) {
-    Write-Host 'No se encontro la carpeta del backend.' -ForegroundColor Red
+function Is-BackendRunning {
+    try {
+        Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 3 | Out-Null
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Wait-BackendReady {
+    param([int]$TimeoutSeconds = 30)
+    $start = Get-Date
+    while ((Get-Date) -lt $start.AddSeconds($TimeoutSeconds)) {
+        if (Is-BackendRunning) {
+            Write-Host 'Backend listo.' -ForegroundColor Green
+            return
+        }
+        Start-Sleep -Seconds 1
+    }
+    Write-Host 'El backend no respondió a tiempo.' -ForegroundColor Red
     exit 1
 }
 
-if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-    Write-Host '.NET no esta disponible en PATH.' -ForegroundColor Red
-    exit 1
+Write-Host 'Start-backend: preparando el backend para ejecución local.' -ForegroundColor Cyan
+Load-LocalEnv -Path $EnvFile
+
+if ($Restore) {
+    Write-Host 'Restaurando y compilando backend...' -ForegroundColor Yellow
+    Push-Location $backendPath
+    dotnet restore
+    dotnet build -c Release --no-restore
+    Pop-Location
 }
 
-$localIp = Get-LocalIPv4Address
-if ([string]::IsNullOrWhiteSpace($localIp)) {
-    Write-Host 'No se pudo detectar una IP local. Usando localhost para desarrollo local.' -ForegroundColor Yellow
-    $localIp = 'localhost'
+if (Is-BackendRunning) {
+    Write-Host 'El backend ya está en ejecución.' -ForegroundColor Green
 } else {
-    Write-Host "IP Local detectada: $localIp" -ForegroundColor Cyan
+    Write-Host "Iniciando backend en: $BackendUrl" -ForegroundColor Cyan
+    Start-Process -FilePath 'dotnet' -ArgumentList @('run', '--urls', $BackendUrl) -WorkingDirectory $backendPath | Out-Null
+    Wait-BackendReady -TimeoutSeconds 30
 }
-
-Write-Host "════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "  Iniciando Backend Loginova" -ForegroundColor Cyan
-Write-Host "════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "El backend estara disponible en: http://$localIp:5105" -ForegroundColor Green
-Write-Host ""
-Write-Host "Desde tu celular conecta a: http://$localIp:5105/api" -ForegroundColor Green
-Write-Host ""
-Write-Host "Presiona Ctrl+C para detener el backend." -ForegroundColor Yellow
-Write-Host ""
-Write-Host "════════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host ""
-
-Set-Location $backendPath
-& dotnet run --urls "$backendUrl"

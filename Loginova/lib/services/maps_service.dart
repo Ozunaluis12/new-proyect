@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../utils/app_logger.dart';
+
 /// Información de una ruta entre dos puntos.
 class RouteInfo {
   final double distanceMeters;
@@ -79,19 +81,19 @@ class MapsService {
       final response = await http.get(url);
 
       if (response.statusCode != 200) {
-        print('Error en Directions API: ${response.statusCode}');
+        AppLogger.warn('Error en Directions API: ${response.statusCode}');
         return null;
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (data['status'] != 'OK') {
-        print('Directions API status: ${data['status']}');
+        AppLogger.warn('Directions API status: ${data['status']}');
         return null;
       }
 
       if ((data['routes'] as List).isEmpty) {
-        print('No se encontraron rutas');
+        AppLogger.debug('No se encontraron rutas');
         return null;
       }
 
@@ -116,7 +118,7 @@ class MapsService {
         summary: leg['summary'] as String?,
       );
     } catch (e) {
-      print('Error obteniendo ruta: $e');
+      AppLogger.warn('Error obteniendo ruta: $e', error: e);
       return null;
     }
   }
@@ -141,19 +143,19 @@ class MapsService {
 
       final response = await http.get(url);
       if (response.statusCode != 200) {
-        print('Error en OSRM: ${response.statusCode}');
+        AppLogger.warn('Error en OSRM: ${response.statusCode}');
         return null;
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (data['code'] != 'Ok') {
-        print('OSRM status: ${data['code']}');
+        AppLogger.warn('OSRM status: ${data['code']}');
         return null;
       }
 
       final routes = data['routes'] as List<dynamic>;
       if (routes.isEmpty) {
-        print('No se encontraron rutas en OSRM');
+        AppLogger.debug('No se encontraron rutas en OSRM');
         return null;
       }
 
@@ -170,7 +172,7 @@ class MapsService {
         summary: 'Ruta estimada (OSRM)',
       );
     } catch (e) {
-      print('Error obteniendo ruta en OSRM: $e');
+      AppLogger.warn('Error obteniendo ruta en OSRM: $e', error: e);
       return null;
     }
   }
@@ -184,7 +186,7 @@ class MapsService {
     bool optimizeWaypoints = true,
   }) async {
     if (_apiKey == null) {
-      print('API Key no configurada');
+      AppLogger.warn('API Key no configurada');
       return null;
     }
 
@@ -206,19 +208,19 @@ class MapsService {
       final response = await http.get(url);
 
       if (response.statusCode != 200) {
-        print('Error en Directions API: ${response.statusCode}');
+        AppLogger.warn('Error en Directions API: ${response.statusCode}');
         return null;
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (data['status'] != 'OK') {
-        print('Directions API status: ${data['status']}');
+        AppLogger.warn('Directions API status: ${data['status']}');
         return null;
       }
 
       if ((data['routes'] as List).isEmpty) {
-        print('No se encontraron rutas');
+        AppLogger.debug('No se encontraron rutas');
         return null;
       }
 
@@ -248,7 +250,7 @@ class MapsService {
         polylineEncoded: polylineEncoded,
       );
     } catch (e) {
-      print('Error obteniendo ruta optimizada: $e');
+      AppLogger.warn('Error obteniendo ruta optimizada: $e', error: e);
       return null;
     }
   }
@@ -303,7 +305,7 @@ class MapsService {
     required List<LatLng> destinations,
   }) async {
     if (_apiKey == null) {
-      print('API Key no configurada');
+      AppLogger.warn('API Key no configurada');
       return null;
     }
 
@@ -326,13 +328,13 @@ class MapsService {
       );
 
       if (response.statusCode != 200) {
-        print('Error en Distance Matrix API: ${response.statusCode}');
+        AppLogger.warn('Error en Distance Matrix API: ${response.statusCode}');
         return null;
       }
 
       return jsonDecode(response.body) as Map<String, dynamic>;
     } catch (e) {
-      print('Error obteniendo matriz de distancias: $e');
+      AppLogger.warn('Error obteniendo matriz de distancias: $e', error: e);
       return null;
     }
   }

@@ -178,9 +178,11 @@ c:\Users\ozuna\new proyect\
 │       └── ...
 │
 └── 📁 scripts/
-    ├── run-all.ps1
-    ├── setup-dev.ps1
-    └── smoke-api.ps1
+   ├── start-backend.ps1
+   ├── build-apk.ps1
+   ├── run-local.ps1
+   ├── smoke-api.ps1
+   └── db_persistence_check.ps1
 ```
 
 ---

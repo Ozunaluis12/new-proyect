@@ -24,6 +24,15 @@ public class Recogida
     [Column("cantidad_paquetes")]
     public int CantidadPaquetes { get; set; }
 
+    [Column("dinero_recibido")]
+    public bool DineroRecibido { get; set; }
+
+    [Column("monto_cobrado")]
+    public decimal? MontoCobrado { get; set; }
+
+    [Column("forma_pago_ultima")]
+    public string? FormaPagoUltima { get; set; }
+
     [Column("observaciones")]
     public string? Observaciones { get; set; }
 
@@ -47,4 +56,5 @@ public class Recogida
 
     public List<Evidencia> Evidencias { get; set; } = [];
     public List<HistorialEstado> HistorialEstados { get; set; } = [];
+    public List<Ingreso> Ingresos { get; set; } = [];
 }

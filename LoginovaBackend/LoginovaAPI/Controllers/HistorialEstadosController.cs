@@ -61,6 +61,7 @@ public class HistorialEstadosController : ControllerBase
     /// <param name="request">Datos del cambio de estado (recogida, estados anterior y nuevo, usuario).</param>
     /// <returns>El registro historico creado con su identificador.</returns>
     [HttpPost]
+    [Authorize(Roles = "Administrador")]
     public async Task<ActionResult<HistorialEstado>> Create(HistorialEstadoRequest request)
     {
         if (!await _context.Recogidas.AnyAsync(r => r.Id == request.RecogidaId))
@@ -92,6 +93,7 @@ public class HistorialEstadosController : ControllerBase
     /// <param name="request">Nuevos datos del cambio de estado.</param>
     /// <returns>NoContent si la actualizacion fue exitosa.</returns>
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Administrador")]
     public async Task<IActionResult> Update(int id, HistorialEstadoRequest request)
     {
         var historial = await _context.HistorialEstados.FindAsync(id);
@@ -123,6 +125,7 @@ public class HistorialEstadosController : ControllerBase
     /// <param name="id">Identificador del registro a eliminar.</param>
     /// <returns>NoContent si la eliminacion fue exitosa.</returns>
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Administrador")]
     public async Task<IActionResult> Delete(int id)
     {
         var historial = await _context.HistorialEstados.FindAsync(id);

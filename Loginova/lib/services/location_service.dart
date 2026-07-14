@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart' as geocoding;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'api_service.dart';
+import '../utils/app_logger.dart';
+import 'geocoding_service.dart';
 
 /// Resultado de ubicación actual del dispositivo.
 class LocationData {
@@ -92,7 +93,7 @@ class LocationService {
         timestamp: DateTime.now(),
       );
     } catch (e) {
-      print('Error obteniendo ubicación: $e');
+      AppLogger.warn('Error obteniendo ubicación: $e', error: e);
       return null;
     }
   }
@@ -125,11 +126,11 @@ class LocationService {
             _uploadLocationToBackend(position);
           },
           onError: (e) {
-            print('Error en stream de ubicación: $e');
+            AppLogger.warn('Error en stream de ubicación: $e', error: e);
           },
         );
 
-    print('Rastreo de ubicación iniciado');
+    AppLogger.info('Rastreo de ubicación iniciado');
   }
 
   /// Detiene el rastreo de ubicación.
@@ -137,7 +138,7 @@ class LocationService {
     _isTracking = false;
     _positionStream?.cancel();
     _uploadTimer?.cancel();
-    print('Rastreo de ubicación detenido');
+    AppLogger.info('Rastreo de ubicación detenido');
   }
 
   /// Sube la ubicación actual al backend.
@@ -159,7 +160,7 @@ class LocationService {
 
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print('Error enviando ubicación: $e');
+      AppLogger.warn('Error enviando ubicación: $e', error: e);
       return false;
     }
   }
@@ -170,17 +171,9 @@ class LocationService {
     double longitude,
   ) async {
     try {
-      final placemarks = await geocoding.placemarkFromCoordinates(
-        latitude,
-        longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        final p = placemarks.first;
-        return '${p.street}, ${p.locality}, ${p.administrativeArea}';
-      }
+      return await GeocodingService.reverseGeocode(latitude, longitude);
     } catch (e) {
-      print('Error en reverse geocoding: $e');
+      AppLogger.warn('Error en reverse geocoding: $e', error: e);
     }
     return null;
   }
@@ -188,19 +181,9 @@ class LocationService {
   /// Obtiene coordenadas a partir de una dirección (forward geocoding).
   static Future<LocationData?> getCoordinatesFromAddress(String address) async {
     try {
-      final locations = await geocoding.locationFromAddress(address);
-
-      if (locations.isNotEmpty) {
-        final loc = locations.first;
-        return LocationData(
-          latitude: loc.latitude,
-          longitude: loc.longitude,
-          accuracy: 0,
-          timestamp: DateTime.now(),
-        );
-      }
+      return await GeocodingService.geocodeAddress(address);
     } catch (e) {
-      print('Error en geocoding: $e');
+      AppLogger.warn('Error en geocoding: $e', error: e);
     }
     return null;
   }

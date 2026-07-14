@@ -11,6 +11,8 @@ import '../providers/proximity_provider.dart';
 import '../services/location_service.dart';
 import '../services/proximity_service.dart';
 import '../themes/app_theme.dart';
+import '../utils/app_logger.dart';
+import '../widgets/menu_drawer.dart';
 import '../widgets/proximity_indicator.dart';
 
 /// Pantalla interactiva que muestra recogidas en un mapa con ubicación en tiempo real del operador.
@@ -28,14 +30,17 @@ class _MapaScreenState extends State<MapaScreen> {
   bool _showOperatorMarker = false;
   Timer? _markerDebounce;
 
-  // Ubicación por defecto: Centro de Medellín, Colombia
-  static const LatLng _ubicacionPorDefecto = LatLng(6.2442, -75.5812);
-  static const double _zoomInicial = 13;
+  // Ubicación por defecto mientras carga el GPS (usada solo como fallback)
+  static const LatLng _ubicacionFallback = LatLng(6.2442, -75.5812);
+  static const double _zoomInicial =
+      15; // Zoom más cercano para ver la ubicación real
 
   @override
   void initState() {
     super.initState();
-    _initializeLocationTracking();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeLocationTracking();
+    });
   }
 
   /// Inicializa el rastreo de ubicación del operador
@@ -58,18 +63,30 @@ class _MapaScreenState extends State<MapaScreen> {
       await locationProvider.getCurrentLocation();
 
       if (mounted && locationProvider.currentLocation != null) {
+        final loc = locationProvider.currentLocation!;
         setState(() {
-          _operatorLocation = locationProvider.currentLocation;
+          _operatorLocation = loc;
           _showOperatorMarker = true;
         });
+
+        // Mover el mapa a la ubicación real del operador
+        _mapController.move(LatLng(loc.latitude, loc.longitude), _zoomInicial);
 
         // Iniciar rastreo de proximidad
         await proximityProvider.startProximityTracking(
           recogidaProvider.recogidas,
         );
+      } else if (mounted) {
+        // Si no hay ubicación, mostrar indicador de error amigable
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Activa el GPS para ver tu ubicación en el mapa'),
+            duration: Duration(seconds: 3),
+          ),
+        );
       }
     } catch (e) {
-      print('Error inicializando ubicación: $e');
+      AppLogger.warn('Error inicializando ubicación: $e', error: e);
     }
   }
 
@@ -93,9 +110,16 @@ class _MapaScreenState extends State<MapaScreen> {
         _buildPickupMarkers(recogidas, proximities),
       );
       if (_showOperatorMarker && location != null) {
+        final prevLocation = _operatorLocation;
         _operatorLocation = location;
-        final operatorMarker = _buildOperatorMarker();
-        newMarkers.add(operatorMarker);
+        // Mover el mapa automáticamente si la ubicación cambió significativamente (primera vez)
+        if (prevLocation == null) {
+          _mapController.move(
+            LatLng(location.latitude, location.longitude),
+            _zoomInicial,
+          );
+        }
+        newMarkers.add(_buildOperatorMarker()!);
       }
       setState(() {
         _markers.clear();
@@ -110,8 +134,8 @@ class _MapaScreenState extends State<MapaScreen> {
   }
 
   /// Construye el marcador del operador (ubicación actual)
-  Marker _buildOperatorMarker() {
-    if (_operatorLocation == null) return null as dynamic;
+  Marker? _buildOperatorMarker() {
+    if (_operatorLocation == null) return null;
 
     return Marker(
       point: _locationDataToLatLng(_operatorLocation!),
@@ -363,6 +387,7 @@ class _MapaScreenState extends State<MapaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: const MenuDrawer(currentRoute: '/mapa'),
       appBar: AppBar(
         title: const Text('Mapa de Recogidas en Tiempo Real'),
         elevation: 0,
@@ -405,7 +430,12 @@ class _MapaScreenState extends State<MapaScreen> {
                   FlutterMap(
                     mapController: _mapController,
                     options: MapOptions(
-                      initialCenter: _ubicacionPorDefecto,
+                      initialCenter: _operatorLocation != null
+                          ? LatLng(
+                              _operatorLocation!.latitude,
+                              _operatorLocation!.longitude,
+                            )
+                          : _ubicacionFallback,
                       initialZoom: _zoomInicial,
                     ),
                     children: [
@@ -485,6 +515,7 @@ class _MapaScreenState extends State<MapaScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         FloatingActionButton(
+                          heroTag: 'refresh_pickups',
                           onPressed: () async {
                             await recogidaProvider.cargarRecogidas();
                           },
@@ -493,6 +524,7 @@ class _MapaScreenState extends State<MapaScreen> {
                         ),
                         const SizedBox(height: 12),
                         FloatingActionButton(
+                          heroTag: 'center_map',
                           mini: true,
                           onPressed: () async {
                             if (locationProvider.currentLocation != null) {

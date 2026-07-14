@@ -33,9 +33,28 @@ El proyecto mantiene una separación clara entre presentación, lógica y persis
 
 ## Ejecución y validación
 
-- Iniciar frontend y backend: `./scripts/run-all.ps1`
-- Iniciar y validar API automáticamente: `./scripts/run-all.ps1 -WithSmoke`
+- Iniciar backend local: `./scripts/start-backend.ps1`
+- Generar APK release: `./scripts/build-apk.ps1 -ApiBaseUrl http://127.0.0.1:5105/api`
+- Ejecutar Flutter local (arranca backend si no está activo): `./scripts/run-local.ps1 -ApiBaseUrl http://127.0.0.1:5105/api`
 - Ejecutar validación API+BD (CRUD principal): `./scripts/smoke-api.ps1`
+- Verificar persistencia de base de datos: `./scripts/db_persistence_check.ps1`
+
+Para celular físico en la misma red:
+- Inicia el backend con `./scripts/start-backend.ps1`
+- Construye el APK usando la IP de tu PC en la red local, por ejemplo:
+  `./scripts/build-apk.ps1 -ApiBaseUrl http://192.168.1.50:5105/api`
+- Si ejecutas en local en un dispositivo físico, usa también:
+  `./scripts/run-local.ps1 -ApiBaseUrl http://192.168.1.50:5105/api`
+- Asegura backend con configuración válida (`ConnectionStrings:DefaultConnection` y `Jwt:Key`), porque si faltan el backend no inicia y el login fallará.
+
+> Nota: un APK instalado en el celular NO puede usar `http://127.0.0.1:5105/api` porque esa dirección apunta al propio teléfono, no a tu PC.
+
+Archivo local recomendado para no repetir secretos:
+- Copia `./scripts/.env.local.example.ps1` como `./scripts/.env.local.ps1` y completa valores.
+- Luego ejecuta sin pasar secretos por comando:
+	`./scripts/run-local.ps1 -ApiBaseUrl http://127.0.0.1:5105/api`
+- Opcional: puedes usar otro archivo con `-EnvFile`, por ejemplo:
+	`./scripts/run-local.ps1 -EnvFile ./scripts/mi-entorno.ps1 -ApiBaseUrl http://192.168.1.50:5105/api`
 
 El smoke test valida autenticación, clientes, recogidas y evidencias con operaciones de creación, consulta, actualización y eliminación, incluyendo limpieza de datos de prueba.
 
