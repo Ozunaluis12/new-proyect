@@ -25,7 +25,10 @@ public class PasswordHasher
     {
         if (!storedPassword.StartsWith("pbkdf2$", StringComparison.Ordinal))
         {
-            return string.Equals(password, storedPassword, StringComparison.Ordinal);
+            // Ya no se acepta ningún formato distinto a pbkdf2$: no hay comparación
+            // en texto plano. Una cuenta con un hash legado debe restablecer su
+            // contraseña por el flujo de recuperación.
+            return false;
         }
 
         var parts = storedPassword.Split('$');

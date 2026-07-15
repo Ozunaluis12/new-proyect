@@ -17,6 +17,7 @@ public class Usuario
     public string Correo { get; set; } = "";
 
     [Column("password_hash")]
+    [System.Text.Json.Serialization.JsonIgnore]
     public string Password { get; set; } = "";
 
     [Column("telefono")]

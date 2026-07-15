@@ -17,6 +17,8 @@ public static class PermisosCatalogo
     public const string GestionarNotificaciones = "gestionar_notificaciones";
     public const string VerUbicaciones = "ver_ubicaciones";
     public const string GestionarUbicaciones = "gestionar_ubicaciones";
+    public const string VerClientes = "ver_clientes";
+    public const string GestionarClientes = "gestionar_clientes";
 
     public static readonly HashSet<string> Todos = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -32,6 +34,8 @@ public static class PermisosCatalogo
         GestionarNotificaciones,
         VerUbicaciones,
         GestionarUbicaciones,
+        VerClientes,
+        GestionarClientes,
     };
 
     public static readonly HashSet<string> RolesGestion = new(StringComparer.OrdinalIgnoreCase)

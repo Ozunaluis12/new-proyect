@@ -71,6 +71,11 @@ class LocationProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      // Si ya había una suscripción activa (p. ej. startTracking() se llamó
+      // dos veces sin detener la anterior), se cancela antes de crear una
+      // nueva para no dejarla huérfana escuchando en segundo plano.
+      await _locationSubscription?.cancel();
+
       // Suscribirse al stream de ubicación para emitir cambios
       _locationSubscription = _locationService.locationStream.listen(
         (LocationData location) {
@@ -96,6 +101,7 @@ class LocationProvider extends ChangeNotifier {
   void stopTracking() {
     _locationService.stopTracking();
     _locationSubscription?.cancel();
+    _locationSubscription = null;
     _isTracking = false;
     notifyListeners();
   }

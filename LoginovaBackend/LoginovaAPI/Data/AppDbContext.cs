@@ -55,6 +55,9 @@ public class AppDbContext : DbContext
     public DbSet<Notificacion> Notificaciones =>
         Set<Notificacion>();
 
+    public DbSet<PasswordResetToken> PasswordResetTokens =>
+        Set<PasswordResetToken>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -91,7 +94,9 @@ public class AppDbContext : DbContext
                 new Permiso { Id = 9, Nombre = PermisosCatalogo.VerAuditoria, Descripcion = "Ver historial y auditoría" },
                 new Permiso { Id = 10, Nombre = PermisosCatalogo.GestionarNotificaciones, Descripcion = "Gestionar notificaciones" },
                 new Permiso { Id = 11, Nombre = PermisosCatalogo.VerUbicaciones, Descripcion = "Ver ubicaciones de operadores" },
-                new Permiso { Id = 12, Nombre = PermisosCatalogo.GestionarUbicaciones, Descripcion = "Gestionar ubicaciones de operadores" });
+                new Permiso { Id = 12, Nombre = PermisosCatalogo.GestionarUbicaciones, Descripcion = "Gestionar ubicaciones de operadores" },
+                new Permiso { Id = 13, Nombre = PermisosCatalogo.VerClientes, Descripcion = "Ver clientes del sistema" },
+                new Permiso { Id = 14, Nombre = PermisosCatalogo.GestionarClientes, Descripcion = "Crear, editar y eliminar clientes" });
 
         modelBuilder.Entity<Ubicacion>().ToTable("ubicaciones");
         modelBuilder.Entity<HistorialEstado>().ToTable("historial_estados");
@@ -174,5 +179,27 @@ public class AppDbContext : DbContext
             .WithMany(u => u.CierresCaja)
             .HasForeignKey(c => c.OperadorId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Evita cierres de caja duplicados para el mismo operador/día.
+        modelBuilder.Entity<CierreCaja>()
+            .HasIndex(c => new { c.OperadorId, c.Fecha })
+            .IsUnique();
+
+        modelBuilder.Entity<PasswordResetToken>().ToTable("password_reset_tokens");
+        modelBuilder.Entity<PasswordResetToken>()
+            .HasOne(token => token.Usuario)
+            .WithMany()
+            .HasForeignKey(token => token.UsuarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<PasswordResetToken>()
+            .HasIndex(token => new { token.UsuarioId, token.TokenHash });
+
+        // La auditoría se consulta y se escribe en cada request: indexar las columnas de filtro.
+        modelBuilder.Entity<AuditoriaLog>()
+            .HasIndex(log => log.UsuarioId);
+        modelBuilder.Entity<AuditoriaLog>()
+            .HasIndex(log => new { log.EntidadTipo, log.EntidadId });
+        modelBuilder.Entity<AuditoriaLog>()
+            .HasIndex(log => log.Accion);
     }
 }

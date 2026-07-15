@@ -1,0 +1,41 @@
+databases:
+  - name: loginova-db
+    plan: free
+    databaseName: loginova
+    user: loginova
+
+services:
+  - type: web
+    name: loginova-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./LoginovaBackend/LoginovaAPI/Dockerfile
+    dockerContext: ./LoginovaBackend/LoginovaAPI
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__DefaultConnection
+        fromDatabase:
+          name: loginova-db
+          property: connectionString
+      - key: Jwt__Key
+        generateValue: true
+      - key: Jwt__Issuer
+        value: LoginovaAPI
+      - key: Jwt__Audience
+        value: LoginovaClient
+      - key: Cors__AllowedOrigins__0
+        value: https://loginova-api.onrender.com
+      - key: Smtp__Host
+        value: smtp.gmail.com
+      - key: Smtp__Port
+        value: "587"
+      - key: Smtp__EnableSsl
+        value: "true"
+      - key: Smtp__User
+        sync: false
+      - key: Smtp__Password
+        sync: false
+      - key: Smtp__From
+        sync: false

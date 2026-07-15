@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Servicio que gestiona la configuración de la API y el almacenamiento de sesión.
 /// Proporciona métodos para manejar tokens y datos del usuario en SharedPreferences.
@@ -32,35 +32,37 @@ class ApiService {
   static const String _tokenKey = 'loginova_token';
   static const String _usuarioKey = 'loginova_usuario';
 
+  // El token JWT y los datos de sesión se guardan cifrados con las
+  // primitivas seguras del sistema operativo (Keystore/Keychain/Credential
+  // Manager) en vez de en preferencias planas, para que no queden legibles
+  // por cualquiera con acceso al almacenamiento del dispositivo.
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+
   /// Token JWT actual de la sesión.
   static String? token;
 
-  /// Carga el token guardado desde las preferencias locales.
+  /// Carga el token guardado desde el almacenamiento seguro.
   static Future<void> loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    token = prefs.getString(_tokenKey);
+    token = await _secureStorage.read(key: _tokenKey);
   }
 
-  /// Guarda el token y datos del usuario en las preferencias locales.
+  /// Guarda el token y datos del usuario en el almacenamiento seguro.
   static Future<void> saveSession(String newToken, String usuarioJson) async {
-    final prefs = await SharedPreferences.getInstance();
     token = newToken;
-    await prefs.setString(_tokenKey, newToken);
-    await prefs.setString(_usuarioKey, usuarioJson);
+    await _secureStorage.write(key: _tokenKey, value: newToken);
+    await _secureStorage.write(key: _usuarioKey, value: usuarioJson);
   }
 
-  /// Carga los datos del usuario guardados en las preferencias locales.
+  /// Carga los datos del usuario guardados en el almacenamiento seguro.
   static Future<String?> loadUsuarioJson() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_usuarioKey);
+    return _secureStorage.read(key: _usuarioKey);
   }
 
   /// Limpia la sesión eliminando el token y datos del usuario.
   static Future<void> clearSession() async {
-    final prefs = await SharedPreferences.getInstance();
     token = null;
-    await prefs.remove(_tokenKey);
-    await prefs.remove(_usuarioKey);
+    await _secureStorage.delete(key: _tokenKey);
+    await _secureStorage.delete(key: _usuarioKey);
   }
 
   /// Retorna los encabezados HTTP necesarios para las solicitudes a la API.

@@ -17,8 +17,8 @@ FRONTEND (Flutter)              BACKEND (.NET 8)              BD (PostgreSQL)
 ├── Mapas ✅                   ├── UbicacionesController ✅  ├── historial_estados ✅
 ├── Ubicación Real-time ✨     ├── NotificacionesController ✨ ├── auditoria ✅
 ├── Geocodificación ✨         ├── NotificacionService ✨    ├── notificaciones ✨
-├── Rutas Optimizadas ✨       └── FirebaseConfig (pendiente) └── (8 tablas)
-└── Notificaciones Push ✨
+├── Rutas (OpenStreetMap/OSRM) ✅ └── FirebaseConfig (pendiente) └── (8 tablas)
+└── Notificaciones Push ⏳ (pendiente config. Firebase)
 ```
 
 ---
@@ -43,9 +43,9 @@ FRONTEND (Flutter)              BACKEND (.NET 8)              BD (PostgreSQL)
 | Característica | Estado | Componentes |
 |---|---|---|
 | Posición Real-time | ✅ 100% | LocationService + LocationProvider + Backend |
-| Geocodificación | ✅ 100% | GeocodingService |
-| Rutas Optimizadas | ✅ 100% | MapsService + MapsProvider |
-| Notificaciones Push | ✅ 100% | FirebaseService + NotificacionService + Backend |
+| Geocodificación | ✅ 100% | GeocodingService (Nominatim/OpenStreetMap) |
+| Rutas | ✅ 100% (OSM/OSRM) | MapsService + MapsProvider. Usa el servidor público OSRM por defecto; Google Directions es opcional y solo se activa si se define `GOOGLE_MAPS_API_KEY` |
+| Notificaciones Push | ⏳ Pendiente configuración | FirebaseService + NotificacionService + Backend implementados, pero requieren `google-services.json`/`GoogleService-Info.plist` y credenciales de Firebase que aún no existen en el proyecto |
 | Route Widgets | ✅ 100% | RouteInfoCard, RouteCalculatorButton, LocationTrackingWidget |
 
 ---

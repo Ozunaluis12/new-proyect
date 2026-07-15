@@ -16,35 +16,38 @@ public class EvidenciasController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly EvidenciaStorageService _storageService;
+    private readonly PermisosService _permisosService;
 
-    public EvidenciasController(AppDbContext context, EvidenciaStorageService storageService)
+    public EvidenciasController(AppDbContext context, EvidenciaStorageService storageService, PermisosService permisosService)
     {
         _context = context;
         _storageService = storageService;
+        _permisosService = permisosService;
     }
 
     /// <summary>Obtiene la lista completa de evidencias registradas en el sistema.</summary>
     /// <returns>Lista de todas las evidencias.</returns>
     [HttpGet]
-    public async Task<ActionResult<List<Evidencia>>> GetAll()
+    public async Task<ActionResult<List<EvidenciaResponse>>> GetAll()
     {
-        return Ok(await _context.Evidencias.AsNoTracking().ToListAsync());
+        var evidencias = await _context.Evidencias.AsNoTracking().ToListAsync();
+        return Ok(evidencias.Select(ToResponse).ToList());
     }
 
     /// <summary>Obtiene una evidencia por su identificador.</summary>
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<Evidencia>> GetById(int id)
+    public async Task<ActionResult<EvidenciaResponse>> GetById(int id)
     {
         var evidencia = await _context.Evidencias
             .AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == id);
 
-        return evidencia is null ? NotFound() : Ok(evidencia);
+        return evidencia is null ? NotFound() : Ok(ToResponse(evidencia));
     }
 
     /// <summary>Obtiene evidencias asociadas a una recogida.</summary>
     [HttpGet("recogida/{recogidaId:int}")]
-    public async Task<ActionResult<List<Evidencia>>> GetByRecogida(int recogidaId)
+    public async Task<ActionResult<List<EvidenciaResponse>>> GetByRecogida(int recogidaId)
     {
         if (!await _context.Recogidas.AnyAsync(recogida => recogida.Id == recogidaId))
         {
@@ -56,14 +59,16 @@ public class EvidenciasController : ControllerBase
             .Where(evidencia => evidencia.RecogidaId == recogidaId)
             .ToListAsync();
 
-        return Ok(evidencias);
+        return Ok(evidencias.Select(ToResponse).ToList());
     }
 
     /// <summary>Crea una nueva evidencia (foto) para una recogida especifica.</summary>
     /// <param name="request">Datos de la evidencia a crear (recogida, foto, comentario).</param>
     /// <returns>La evidencia creada con su identificador.</returns>
     [HttpPost]
-    public async Task<ActionResult<Evidencia>> Create([FromForm] EvidenciaUploadRequest request)
+    [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<ActionResult<EvidenciaResponse>> Create([FromForm] EvidenciaUploadRequest request)
     {
         var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;
         if (usuarioIdClaim == 0)
@@ -71,8 +76,7 @@ public class EvidenciasController : ControllerBase
             return Forbid();
         }
 
-        var permisosService = new PermisosService(_context);
-        if (!await permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.SubirEvidencias))
+        if (!await _permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.SubirEvidencias))
         {
             return Forbid();
         }
@@ -87,12 +91,16 @@ public class EvidenciasController : ControllerBase
             return BadRequest(new { mensaje = "Debes adjuntar una imagen" });
         }
 
+        if (!_storageService.EsImagenValida(request.Foto, out var errorImagen))
+        {
+            return BadRequest(new { mensaje = errorImagen });
+        }
+
         var uploadsRoot = _storageService.GetUploadsRootPath();
         var recogidaFolder = Path.Combine(uploadsRoot, request.RecogidaId.ToString());
         Directory.CreateDirectory(recogidaFolder);
 
-        var extension = Path.GetExtension(request.Foto.FileName);
-        var fileName = $"{Guid.NewGuid():N}{extension}";
+        var fileName = _storageService.GenerarNombreArchivo(request.Foto);
         var fullPath = Path.Combine(recogidaFolder, fileName);
 
         await using (var stream = new FileStream(fullPath, FileMode.Create))
@@ -113,8 +121,15 @@ public class EvidenciasController : ControllerBase
         _context.Evidencias.Add(evidencia);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetAll), evidencia);
+        return CreatedAtAction(nameof(GetById), new { id = evidencia.Id }, ToResponse(evidencia));
     }
+
+    private static EvidenciaResponse ToResponse(Evidencia evidencia) => new(
+        evidencia.Id,
+        evidencia.RecogidaId,
+        evidencia.FotoUrl,
+        evidencia.Comentario,
+        evidencia.FechaCreacion);
 
     /// <summary>Elimina una evidencia por su identificador.</summary>
     [HttpDelete("{id:int}")]

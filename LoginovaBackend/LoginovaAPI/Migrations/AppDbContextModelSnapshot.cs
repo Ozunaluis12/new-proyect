@@ -71,7 +71,54 @@ namespace LoginovaAPI.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Accion");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.HasIndex("EntidadTipo", "EntidadId");
+
                     b.ToTable("auditoria_logs", (string)null);
+                });
+
+            modelBuilder.Entity("LoginovaAPI.Models.CierreCaja", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CreadoPor")
+                        .HasColumnType("integer")
+                        .HasColumnName("creado_por");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_creacion");
+
+                    b.Property<decimal>("MontoTotal")
+                        .HasColumnType("numeric")
+                        .HasColumnName("monto_total");
+
+                    b.Property<string>("Observaciones")
+                        .HasColumnType("text")
+                        .HasColumnName("observaciones");
+
+                    b.Property<int>("OperadorId")
+                        .HasColumnType("integer")
+                        .HasColumnName("operador_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperadorId", "Fecha")
+                        .IsUnique();
+
+                    b.ToTable("cierres_caja", (string)null);
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.Cliente", b =>
@@ -305,6 +352,43 @@ namespace LoginovaAPI.Migrations
                     b.ToTable("notificaciones");
                 });
 
+            modelBuilder.Entity("LoginovaAPI.Models.PasswordResetToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ExpiraEn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expira_en");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fecha_creacion");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token_hash");
+
+                    b.Property<bool>("Usado")
+                        .HasColumnType("boolean")
+                        .HasColumnName("usado");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId", "TokenHash");
+
+                    b.ToTable("password_reset_tokens", (string)null);
+                });
+
             modelBuilder.Entity("LoginovaAPI.Models.Permiso", b =>
                 {
                     b.Property<int>("Id")
@@ -363,6 +447,54 @@ namespace LoginovaAPI.Migrations
                             Id = 6,
                             Descripcion = "Ver control de ingresos",
                             Nombre = "ver_ingresos"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Descripcion = "Ver usuarios del sistema",
+                            Nombre = "ver_usuarios"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Descripcion = "Crear y editar usuarios",
+                            Nombre = "gestionar_usuarios"
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Descripcion = "Ver historial y auditoría",
+                            Nombre = "ver_auditoria"
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Descripcion = "Gestionar notificaciones",
+                            Nombre = "gestionar_notificaciones"
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Descripcion = "Ver ubicaciones de operadores",
+                            Nombre = "ver_ubicaciones"
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Descripcion = "Gestionar ubicaciones de operadores",
+                            Nombre = "gestionar_ubicaciones"
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Descripcion = "Ver clientes del sistema",
+                            Nombre = "ver_clientes"
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Descripcion = "Crear, editar y eliminar clientes",
+                            Nombre = "gestionar_clientes"
                         });
                 });
 
@@ -591,12 +723,23 @@ namespace LoginovaAPI.Migrations
                             Id = 1,
                             Activo = true,
                             Correo = "admin@loginova.com",
-                            FechaCreacion = new DateTime(2026, 7, 4, 1, 45, 8, 78, DateTimeKind.Utc).AddTicks(5873),
+                            FechaCreacion = new DateTime(2026, 7, 15, 15, 31, 10, 680, DateTimeKind.Utc).AddTicks(552),
                             Nombre = "Administrador",
-                            Password = "pbkdf2$100000$Mz5H5D/HLBMh8XJpehefgg==$oHa6c+5jiazyNL+1zbvpvCdxS1xssd0yi1JSLFwh3nU=",
+                            Password = "pbkdf2$100000$e2FROJMOs2gKMF8/nSZ/NQ==$zzJO+92vPfeWdEJbhpQxv8H0QAn8BaEW3+tJOZJgZNY=",
                             PermisosJson = "[]",
                             RoleId = 1
                         });
+                });
+
+            modelBuilder.Entity("LoginovaAPI.Models.CierreCaja", b =>
+                {
+                    b.HasOne("LoginovaAPI.Models.Usuario", "Operador")
+                        .WithMany("CierresCaja")
+                        .HasForeignKey("OperadorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Operador");
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.Evidencia", b =>
@@ -656,6 +799,17 @@ namespace LoginovaAPI.Migrations
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.Notificacion", b =>
+                {
+                    b.HasOne("LoginovaAPI.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("LoginovaAPI.Models.PasswordResetToken", b =>
                 {
                     b.HasOne("LoginovaAPI.Models.Usuario", "Usuario")
                         .WithMany()
@@ -729,6 +883,8 @@ namespace LoginovaAPI.Migrations
 
             modelBuilder.Entity("LoginovaAPI.Models.Usuario", b =>
                 {
+                    b.Navigation("CierresCaja");
+
                     b.Navigation("HistorialEstados");
 
                     b.Navigation("IngresosRecibidos");

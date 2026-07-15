@@ -16,3 +16,10 @@ public class EvidenciaUploadRequest
 
     public string? Comentario { get; set; }
 }
+
+public record EvidenciaResponse(
+    int Id,
+    int RecogidaId,
+    string FotoUrl,
+    string? Comentario,
+    DateTime FechaCreacion);

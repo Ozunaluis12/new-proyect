@@ -37,7 +37,6 @@ dependencies:
   http: ^1.2.1
   provider: ^6.1.2
   image_picker: ^1.2.3
-  shared_preferences: ^2.3.2
   google_maps_flutter: ^2.10.0
   flutter_map: ^8.3.1
   latlong2: ^0.10.1
@@ -48,6 +47,7 @@ dependencies:
   flutter_local_notifications: ^22.0.1
   path_provider: ^2.0.15
   share_plus: ^13.2.0
+  flutter_secure_storage: ^10.3.1
 
 dev_dependencies:
   flutter_test:

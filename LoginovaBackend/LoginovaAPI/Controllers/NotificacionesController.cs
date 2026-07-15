@@ -81,7 +81,13 @@ public class NotificacionesController : ControllerBase
     [HttpPut("{id:int}/marcar-leida")]
     public async Task<IActionResult> MarcarComoLeida(int id)
     {
-        var resultado = await _notificacionService.MarcarComoLeida(id);
+        var usuarioIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (usuarioIdClaim == null || !int.TryParse(usuarioIdClaim.Value, out var usuarioId))
+        {
+            return Unauthorized(new { mensaje = "Usuario no identificado" });
+        }
+
+        var resultado = await _notificacionService.MarcarComoLeida(id, usuarioId);
         return resultado ? NoContent() : NotFound();
     }
 

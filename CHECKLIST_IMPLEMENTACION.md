@@ -284,13 +284,13 @@
 | Fase | Tarea | % Completo | Estado |
 |------|-------|-----------|--------|
 | 1 | Posición Real-time | 100% | ✅ Listo |
-| 2 | Geocodificación | 100% | ✅ Listo |
-| 3 | Rutas Optimizadas | 100% | ✅ Listo (sin API key) |
-| 4 | Notificaciones | 100% | ✅ Listo (sin Firebase) |
-| 5 | Integración | 90% | ⏳ Config APIs pendiente |
+| 2 | Geocodificación | 100% | ✅ Listo (Nominatim/OSM) |
+| 3 | Rutas | 100% | ✅ Listo con OpenStreetMap/OSRM (Google Maps es opcional, no configurado) |
+| 4 | Notificaciones Push | 0% funcional | ⏳ Código implementado, pero requiere crear un proyecto Firebase y agregar `google-services.json`/`GoogleService-Info.plist` |
+| 5 | Integración | 90% | ⏳ Config Firebase pendiente |
 | 6 | Testing | 20% | ⏳ Pendiente |
 
-**Progreso Total: 92% ✅**
+**Progreso Total: 90% ✅ (funcionalidad de negocio completa; push notifications pendiente)**
 
 ---
 

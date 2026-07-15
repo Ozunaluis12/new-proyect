@@ -184,11 +184,14 @@ public class NotificacionService
 
     public async Task<List<int>> ObtenerUsuariosConPermisoAsync(string permiso, int? excluirUsuarioId = null)
     {
-        var usuarios = await _context.Usuarios
-            .AsNoTracking()
+        // Permisos es una propiedad calculada (deserializa PermisosJson en memoria) y no se
+        // puede traducir a SQL: hay que materializar primero y filtrar del lado del cliente.
+        var todosLosUsuarios = await _context.Usuarios.AsNoTracking().ToListAsync();
+
+        var usuarios = todosLosUsuarios
             .Where(usuario => usuario.Permisos.Any(item => string.Equals(item, permiso, StringComparison.OrdinalIgnoreCase)))
             .Select(usuario => usuario.Id)
-            .ToListAsync();
+            .ToList();
 
         if (excluirUsuarioId.HasValue)
         {
@@ -406,12 +409,12 @@ public class NotificacionService
     }
 
     /// <summary>
-    /// Marca una notificación como leída.
+    /// Marca una notificación como leída. Solo el dueño de la notificación puede hacerlo.
     /// </summary>
-    public async Task<bool> MarcarComoLeida(int notificacionId)
+    public async Task<bool> MarcarComoLeida(int notificacionId, int usuarioId)
     {
         var notificacion = await _context.Notificaciones.FindAsync(notificacionId);
-        if (notificacion == null)
+        if (notificacion == null || notificacion.UsuarioId != usuarioId)
         {
             return false;
         }

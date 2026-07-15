@@ -1,6 +1,7 @@
 using LoginovaAPI.Data;
 using LoginovaAPI.DTOs;
 using LoginovaAPI.Models;
+using LoginovaAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,13 +17,15 @@ namespace LoginovaAPI.Controllers;
 public class ClientesController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly PermisosService _permisosService;
 
     /// <summary>
     /// Constructor que inyecta el contexto de datos.
     /// </summary>
-    public ClientesController(AppDbContext context)
+    public ClientesController(AppDbContext context, PermisosService permisosService)
     {
         _context = context;
+        _permisosService = permisosService;
     }
 
     [HttpGet]
@@ -31,6 +34,11 @@ public class ClientesController : ControllerBase
     /// </summary>
     public async Task<ActionResult<List<Cliente>>> GetAll()
     {
+        if (!await PuedeVerAsync())
+        {
+            return Forbid();
+        }
+
         return Ok(await _context.Clientes.AsNoTracking().ToListAsync());
     }
 
@@ -40,6 +48,11 @@ public class ClientesController : ControllerBase
     /// </summary>
     public async Task<ActionResult<Cliente>> GetById(int id)
     {
+        if (!await PuedeVerAsync())
+        {
+            return Forbid();
+        }
+
         var cliente = await _context.Clientes.FindAsync(id);
         return cliente is null ? NotFound() : Ok(cliente);
     }
@@ -50,6 +63,11 @@ public class ClientesController : ControllerBase
     /// </summary>
     public async Task<ActionResult<Cliente>> Create(ClienteRequest request)
     {
+        if (!await PuedeGestionarAsync())
+        {
+            return Forbid();
+        }
+
         var cliente = new Cliente
         {
             Nombre = request.Nombre,
@@ -70,6 +88,11 @@ public class ClientesController : ControllerBase
     /// </summary>
     public async Task<IActionResult> Update(int id, ClienteRequest request)
     {
+        if (!await PuedeGestionarAsync())
+        {
+            return Forbid();
+        }
+
         var cliente = await _context.Clientes.FindAsync(id);
         if (cliente is null)
         {
@@ -91,6 +114,11 @@ public class ClientesController : ControllerBase
     /// </summary>
     public async Task<IActionResult> Delete(int id)
     {
+        if (!await PuedeGestionarAsync())
+        {
+            return Forbid();
+        }
+
         var cliente = await _context.Clientes.FindAsync(id);
         if (cliente is null)
         {
@@ -100,5 +128,20 @@ public class ClientesController : ControllerBase
         _context.Clientes.Remove(cliente);
         await _context.SaveChangesAsync();
         return NoContent();
+    }
+
+    private Task<bool> PuedeVerAsync() => TienePermisoAsync(PermisosCatalogo.VerClientes);
+
+    private Task<bool> PuedeGestionarAsync() => TienePermisoAsync(PermisosCatalogo.GestionarClientes);
+
+    private async Task<bool> TienePermisoAsync(string permiso)
+    {
+        var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;
+        if (usuarioIdClaim == 0)
+        {
+            return false;
+        }
+
+        return await _permisosService.TienePermisoAsync(usuarioIdClaim, permiso);
     }
 }

@@ -1,32 +1,46 @@
+using System.Security.Cryptography;
 using LoginovaAPI.Data;
 using LoginovaAPI.DTOs;
 using LoginovaAPI.Models;
 using LoginovaAPI.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace LoginovaAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("auth")]
 /// <summary>
 /// Controlador de autenticación que expone endpoints para login,
 /// registro de usuario y recuperación de contraseña.
 /// </summary>
 public class AuthController : ControllerBase
 {
+    private const int CodigoRecuperacionValidezMinutos = 15;
+
     private readonly AppDbContext _context;
     private readonly JwtTokenService _jwtTokenService;
     private readonly PasswordHasher _passwordHasher;
+    private readonly IEmailSender _emailSender;
+    private readonly ILogger<AuthController> _logger;
+    private readonly IWebHostEnvironment _environment;
 
     public AuthController(
         AppDbContext context,
         JwtTokenService jwtTokenService,
-        PasswordHasher passwordHasher)
+        PasswordHasher passwordHasher,
+        IEmailSender emailSender,
+        ILogger<AuthController> logger,
+        IWebHostEnvironment environment)
     {
         _context = context;
         _jwtTokenService = jwtTokenService;
         _passwordHasher = passwordHasher;
+        _emailSender = emailSender;
+        _logger = logger;
+        _environment = environment;
     }
 
     [HttpPost("login")]
@@ -42,12 +56,6 @@ public class AuthController : ControllerBase
         if (usuario is null || !_passwordHasher.Verify(request.Password, usuario.Password))
         {
             return Unauthorized(new { mensaje = "Credenciales invalidas" });
-        }
-
-        if (!usuario.Password.StartsWith("pbkdf2$", StringComparison.Ordinal))
-        {
-            usuario.Password = _passwordHasher.Hash(request.Password);
-            await _context.SaveChangesAsync();
         }
 
         return Ok(CreateAuthResponse(usuario));
@@ -90,19 +98,105 @@ public class AuthController : ControllerBase
 
     [HttpPost("forgot-password")]
     /// <summary>
-    /// Actualiza la contraseña de un usuario existente usando hashing seguro.
+    /// Genera un código de recuperación de un solo uso y lo envía por correo.
+    /// Siempre responde con el mismo mensaje genérico, exista o no el correo,
+    /// para no revelar qué correos están registrados en el sistema.
     /// </summary>
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request)
+    {
+        const string respuestaGenerica = "Si el correo está registrado, enviamos un código de recuperación.";
+
+        var usuario = await _context.Usuarios.SingleOrDefaultAsync(item => item.Correo == request.Correo);
+        if (usuario is null)
+        {
+            return Ok(new { mensaje = respuestaGenerica });
+        }
+
+        var tokensPrevios = await _context.PasswordResetTokens
+            .Where(item => item.UsuarioId == usuario.Id && !item.Usado)
+            .ToListAsync();
+        foreach (var previo in tokensPrevios)
+        {
+            previo.Usado = true;
+        }
+
+        var codigo = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        _context.PasswordResetTokens.Add(new PasswordResetToken
+        {
+            UsuarioId = usuario.Id,
+            TokenHash = HashCodigo(codigo),
+            ExpiraEn = DateTime.UtcNow.AddMinutes(CodigoRecuperacionValidezMinutos),
+        });
+
+        await _context.SaveChangesAsync();
+
+        try
+        {
+            await _emailSender.EnviarAsync(
+                usuario.Correo,
+                "Código de recuperación - Loginova",
+                $"Tu código de recuperación es: {codigo}\n\nEs válido por {CodigoRecuperacionValidezMinutos} minutos y solo puede usarse una vez. Si no solicitaste este cambio, ignora este mensaje.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "No se pudo enviar el correo de recuperación a {UsuarioId}", usuario.Id);
+        }
+
+        if (_environment.IsDevelopment())
+        {
+            // Conveniencia solo para desarrollo local: si aún no configuraste el SMTP,
+            // el código queda visible en el log para poder probar el flujo sin correo real.
+            _logger.LogInformation("[DEV] Código de recuperación para {Correo}: {Codigo}", usuario.Correo, codigo);
+        }
+
+        return Ok(new { mensaje = respuestaGenerica });
+    }
+
+    [HttpPost("reset-password")]
+    /// <summary>
+    /// Valida el código de recuperación y actualiza la contraseña usando hashing seguro.
+    /// </summary>
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
     {
         var usuario = await _context.Usuarios.SingleOrDefaultAsync(item => item.Correo == request.Correo);
         if (usuario is null)
         {
-            return NotFound(new { mensaje = "Correo no registrado" });
+            return BadRequest(new { mensaje = "Código inválido o expirado" });
         }
 
-        usuario.Password = _passwordHasher.Hash(request.Password);
+        var codigoHash = HashCodigo(request.Token);
+        var tokenValido = await _context.PasswordResetTokens
+            .Where(item => item.UsuarioId == usuario.Id
+                && item.TokenHash == codigoHash
+                && !item.Usado
+                && item.ExpiraEn > DateTime.UtcNow)
+            .OrderByDescending(item => item.FechaCreacion)
+            .FirstOrDefaultAsync();
+
+        if (tokenValido is null)
+        {
+            return BadRequest(new { mensaje = "Código inválido o expirado" });
+        }
+
+        tokenValido.Usado = true;
+        usuario.Password = _passwordHasher.Hash(request.NuevaPassword);
+
+        var otrosTokens = await _context.PasswordResetTokens
+            .Where(item => item.UsuarioId == usuario.Id && !item.Usado && item.Id != tokenValido.Id)
+            .ToListAsync();
+        foreach (var otro in otrosTokens)
+        {
+            otro.Usado = true;
+        }
+
         await _context.SaveChangesAsync();
         return NoContent();
+    }
+
+    private static string HashCodigo(string codigo)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(codigo);
+        return Convert.ToHexString(SHA256.HashData(bytes));
     }
 
     private AuthResponse CreateAuthResponse(Usuario usuario)

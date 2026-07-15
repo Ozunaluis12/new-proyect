@@ -15,6 +15,7 @@ class ProximityProvider extends ChangeNotifier {
   bool _isTracking = false;
   String? _error;
   Timer? _notifyDebounce;
+  StreamSubscription<LocationData>? _locationSubscription;
 
   Map<int, ProximityInfo> get proximities => Map.unmodifiable(_proximities);
   LocationData? get currentLocation => _currentLocation;
@@ -44,9 +45,12 @@ class ProximityProvider extends ChangeNotifier {
       _updateProximities(recogidas, location);
       notifyListeners();
 
-      // Suscribirse al stream de ubicación
+      // Suscribirse al stream de ubicación. Si ya había una suscripción
+      // activa (p. ej. se volvió a entrar a la pantalla), se cancela antes
+      // de crear una nueva para no acumular listeners con datos obsoletos.
+      await _locationSubscription?.cancel();
       _locationService.startTracking();
-      _locationService.locationStream.listen(
+      _locationSubscription = _locationService.locationStream.listen(
         (LocationData location) {
           _currentLocation = location;
           _updateProximities(recogidas, location);
@@ -73,6 +77,8 @@ class ProximityProvider extends ChangeNotifier {
 
   /// Detiene el rastreo de proximidad.
   void stopProximityTracking() {
+    _locationSubscription?.cancel();
+    _locationSubscription = null;
     _locationService.stopTracking();
     _isTracking = false;
     _proximities.clear();

@@ -412,23 +412,34 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
   ) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Eliminar Recogida'),
         content: const Text(
           '¿Estás seguro de que deseas eliminar esta recogida? Esta acción no se puede deshacer.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
-              provider.eliminarRecogida(recogidaId);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Recogida eliminada')),
-              );
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                await provider.eliminarRecogida(recogidaId);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Recogida eliminada')),
+                );
+              } catch (_) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('No se pudo eliminar la recogida'),
+                    backgroundColor: LoginovaColors.error,
+                  ),
+                );
+              }
             },
             style: TextButton.styleFrom(foregroundColor: LoginovaColors.error),
             child: const Text('Eliminar'),

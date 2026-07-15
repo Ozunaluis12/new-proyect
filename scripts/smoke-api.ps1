@@ -6,6 +6,63 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+Add-Type -AssemblyName System.Net.Http
+
+function New-TestImageFile {
+    # JPEG válido de 1x1 pixel, suficiente para pasar la validación de imagen del backend.
+    $base64 = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+    $bytes = [Convert]::FromBase64String($base64)
+    $path = Join-Path $env:TEMP "loginova-smoke-test.jpg"
+    [IO.File]::WriteAllBytes($path, $bytes)
+    return $path
+}
+
+function Invoke-MultipartRequest {
+    param(
+        [string]$Uri,
+        [string]$Method = "POST",
+        [hashtable]$Fields = @{},
+        [string]$FilePath,
+        [string]$FileFieldName = "Foto",
+        [hashtable]$Headers = @{}
+    )
+
+    $client = New-Object System.Net.Http.HttpClient
+    foreach ($key in $Headers.Keys) {
+        $client.DefaultRequestHeaders.TryAddWithoutValidation($key, $Headers[$key]) | Out-Null
+    }
+
+    $content = New-Object System.Net.Http.MultipartFormDataContent
+    foreach ($key in $Fields.Keys) {
+        if ($null -ne $Fields[$key]) {
+            $content.Add((New-Object System.Net.Http.StringContent([string]$Fields[$key])), $key)
+        }
+    }
+
+    if ($FilePath) {
+        $fileBytes = [IO.File]::ReadAllBytes($FilePath)
+        $byteContent = New-Object System.Net.Http.ByteArrayContent (,$fileBytes)
+        $byteContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("image/jpeg")
+        $content.Add($byteContent, $FileFieldName, [IO.Path]::GetFileName($FilePath))
+    }
+
+    $httpMethod = [System.Net.Http.HttpMethod]::new($Method)
+    $request = New-Object System.Net.Http.HttpRequestMessage($httpMethod, $Uri)
+    $request.Content = $content
+
+    $response = $client.SendAsync($request).GetAwaiter().GetResult()
+    $body = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+    if (-not $response.IsSuccessStatusCode) {
+        throw "[FAIL] $Method $Uri -> $([int]$response.StatusCode) $body"
+    }
+
+    return [PSCustomObject]@{
+        StatusCode = [int]$response.StatusCode
+        Content    = $body
+    }
+}
+
 function To-Array {
     param($Value)
 
@@ -122,13 +179,9 @@ $recUpdateBody = @{
 $recUpdateResp = Invoke-WebRequest -Uri "$BaseUrl/recogidas/$($recCreada.id)" -Method Put -Headers $headers -ContentType "application/json" -Body $recUpdateBody -UseBasicParsing
 Assert-True ($recUpdateResp.StatusCode -eq 204) "Actualizacion de recogida responde 204"
 
-$eviBody = @{
-    recogidaId = $recCreada.id
-    fotoUrl = "C:/tmp/evidencia-smoke.jpg"
-    comentario = "Evidencia smoke test"
-} | ConvertTo-Json
+$testImagePath = New-TestImageFile
 
-$eviResp = Invoke-WebRequest -Uri "$BaseUrl/evidencias" -Method Post -Headers $headers -ContentType "application/json" -Body $eviBody -UseBasicParsing
+$eviResp = Invoke-MultipartRequest -Uri "$BaseUrl/evidencias" -Fields @{ recogidaId = $recCreada.id; comentario = "Evidencia smoke test" } -FilePath $testImagePath -Headers $headers
 Assert-True ($eviResp.StatusCode -eq 201) "Creacion de evidencia responde 201"
 
 $eviCreada = $eviResp.Content | ConvertFrom-Json
@@ -234,7 +287,9 @@ $subadminPermisos = @(
     "cambiar_estado_recogidas",
     "subir_evidencias",
     "registrar_ingresos",
-    "ver_ingresos"
+    "ver_ingresos",
+    "ver_clientes",
+    "gestionar_clientes"
 )
 
 $subadminBody = @{
@@ -285,16 +340,15 @@ $subRec = $subRecResp.Content | ConvertFrom-Json
 $subRecId = $subRec.id
 Assert-True ($subRecId -gt 0) "Recogida creada por subadministrador con ID valido"
 
-$estadoConIngresoBody = @{
+$estadoConIngresoFields = @{
     estado = "Recogida"
-    fotoUrl = "C:/tmp/evidencia-subadmin.jpg"
     comentario = "Cobro recibido de cliente"
-    dineroRecibido = $true
-    montoCobrado = 12500.50
+    dineroRecibido = "true"
+    montoCobrado = "12500.50"
     formaPago = "Efectivo"
-} | ConvertTo-Json
+}
 
-$estadoConIngresoResp = Invoke-WebRequest -Uri "$BaseUrl/recogidas/$subRecId/estado" -Method Put -Headers $subadminHeaders -ContentType "application/json" -Body $estadoConIngresoBody -UseBasicParsing
+$estadoConIngresoResp = Invoke-MultipartRequest -Uri "$BaseUrl/recogidas/$subRecId/estado" -Method Put -Fields $estadoConIngresoFields -Headers $subadminHeaders
 Assert-True ($estadoConIngresoResp.StatusCode -eq 200) "Subadministrador con permiso registra ingreso en recogida"
 
 $estadoConIngreso = $estadoConIngresoResp.Content | ConvertFrom-Json
@@ -324,7 +378,9 @@ $subadminLiteBody = @{
     permisos = @(
         "crear_recogidas",
         "cambiar_estado_recogidas",
-        "subir_evidencias"
+        "subir_evidencias",
+        "ver_clientes",
+        "gestionar_clientes"
     )
 } | ConvertTo-Json
 
@@ -363,9 +419,9 @@ $subLiteRecId = $subLiteRec.id
 
 $ingresoSinPermisoBloqueado = $false
 try {
-    Invoke-RestMethod -Uri "$BaseUrl/recogidas/$subLiteRecId/estado" -Method Put -ContentType "application/json" -Body $estadoConIngresoBody -Headers $subadminLiteHeaders | Out-Null
+    Invoke-MultipartRequest -Uri "$BaseUrl/recogidas/$subLiteRecId/estado" -Method Put -Fields $estadoConIngresoFields -Headers $subadminLiteHeaders | Out-Null
 } catch {
-    if ($_.Exception.Response.StatusCode.value__ -eq 403) {
+    if ($_.Exception.Message -match '403') {
         $ingresoSinPermisoBloqueado = $true
     }
 }

@@ -13,8 +13,12 @@ public record RegisterRequest(
     string Rol);
 
 public record ForgotPasswordRequest(
+    [Required, EmailAddress] string Correo);
+
+public record ResetPasswordRequest(
     [Required, EmailAddress] string Correo,
-    [Required, MinLength(8)] string Password);
+    [Required] string Token,
+    [Required, MinLength(8)] string NuevaPassword);
 
 public record AuthResponse(
     string Token,

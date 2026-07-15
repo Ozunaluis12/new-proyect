@@ -9,3 +9,12 @@ public record UbicacionRequest(
     double? Velocidad,
     DateTime FechaRegistro);
 
+public record UbicacionResponse(
+    int Id,
+    int UsuarioId,
+    decimal Latitud,
+    decimal Longitud,
+    double PrecisionMetros,
+    double? Velocidad,
+    DateTime FechaRegistro);
+

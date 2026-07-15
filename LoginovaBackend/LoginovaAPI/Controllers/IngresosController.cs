@@ -14,10 +14,12 @@ namespace LoginovaAPI.Controllers;
 public class IngresosController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly PermisosService _permisosService;
 
-    public IngresosController(AppDbContext context)
+    public IngresosController(AppDbContext context, PermisosService permisosService)
     {
         _context = context;
+        _permisosService = permisosService;
     }
 
     [HttpGet]
@@ -33,8 +35,7 @@ public class IngresosController : ControllerBase
             return Forbid();
         }
 
-        var permisosService = new PermisosService(_context);
-        if (!await permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
+        if (!await _permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
         {
             return Forbid();
         }
@@ -97,8 +98,7 @@ public class IngresosController : ControllerBase
             return Forbid();
         }
 
-        var permisosService = new PermisosService(_context);
-        if (!await permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
+        if (!await _permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
         {
             return Forbid();
         }
@@ -185,8 +185,7 @@ public class IngresosController : ControllerBase
             return Forbid();
         }
 
-        var permisosService = new PermisosService(_context);
-        if (!await permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
+        if (!await _permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
         {
             return Forbid();
         }
@@ -214,13 +213,20 @@ public class IngresosController : ControllerBase
             return Forbid();
         }
 
-        var permisosService = new PermisosService(_context);
-        if (!await permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
+        if (!await _permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
         {
             return Forbid();
         }
 
         var date = request.Fecha.Date;
+
+        var yaExiste = await _context.Set<Models.CierreCaja>()
+            .AnyAsync(c => c.OperadorId == request.OperadorId && c.Fecha == date);
+        if (yaExiste)
+        {
+            return Conflict(new { mensaje = "La caja de ese operador ya fue cerrada para esa fecha" });
+        }
+
         var desdeUtc = date.ToUniversalTime();
         var hastaUtc = date.AddDays(1).ToUniversalTime();
 
@@ -241,7 +247,23 @@ public class IngresosController : ControllerBase
         };
 
         _context.Add(cierre);
-        await _context.SaveChangesAsync();
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            var yaExisteAhora = await _context.Set<Models.CierreCaja>()
+                .AnyAsync(c => c.OperadorId == request.OperadorId && c.Fecha == date);
+            if (yaExisteAhora)
+            {
+                // Otra petición concurrente ganó la carrera y ya cerró esta caja.
+                return Conflict(new { mensaje = "La caja de ese operador ya fue cerrada para esa fecha" });
+            }
+
+            throw;
+        }
 
         return Ok(cierre);
     }

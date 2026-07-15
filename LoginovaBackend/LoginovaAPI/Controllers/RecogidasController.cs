@@ -34,16 +34,26 @@ public class RecogidasController : ControllerBase
     private readonly AuditoriaService _auditoria;
     private readonly EvidenciaStorageService _storageService;
     private readonly NotificacionService _notificacionService;
+    private readonly PermisosService _permisosService;
+    private readonly ILogger<RecogidasController> _logger;
 
     /// <summary>
     /// Constructor que recibe el contexto de datos y servicio de auditoría.
     /// </summary>
-    public RecogidasController(AppDbContext context, AuditoriaService auditoria, EvidenciaStorageService storageService, NotificacionService notificacionService)
+    public RecogidasController(
+        AppDbContext context,
+        AuditoriaService auditoria,
+        EvidenciaStorageService storageService,
+        NotificacionService notificacionService,
+        PermisosService permisosService,
+        ILogger<RecogidasController> logger)
     {
         _context = context;
         _auditoria = auditoria;
         _storageService = storageService;
         _notificacionService = notificacionService;
+        _permisosService = permisosService;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -130,17 +140,24 @@ public class RecogidasController : ControllerBase
             HttpContext.Connection.RemoteIpAddress?.ToString()
         );
 
-        await _notificacionService.EnviarNotificacionAUsuariosOperativosAsync(
-            "Nueva recogida creada",
-            $"Se registró una nueva recogida #{recogida.Id} para el cliente #{recogida.ClienteId}.",
-            "nueva_recogida",
-            recogida.Id,
-            new Dictionary<string, string>
-            {
-                ["evento"] = "nueva_recogida",
-                ["clienteId"] = recogida.ClienteId.ToString(),
-            },
-            usuarioIdClaim > 0 ? usuarioIdClaim : null);
+        try
+        {
+            await _notificacionService.EnviarNotificacionAUsuariosOperativosAsync(
+                "Nueva recogida creada",
+                $"Se registró una nueva recogida #{recogida.Id} para el cliente #{recogida.ClienteId}.",
+                "nueva_recogida",
+                recogida.Id,
+                new Dictionary<string, string>
+                {
+                    ["evento"] = "nueva_recogida",
+                    ["clienteId"] = recogida.ClienteId.ToString(),
+                },
+                usuarioIdClaim > 0 ? usuarioIdClaim : null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "No se pudo notificar la creación de la recogida {RecogidaId}", recogida.Id);
+        }
 
         return CreatedAtAction(nameof(GetById), new { id = recogida.Id }, ToResponse(recogida));
     }
@@ -221,6 +238,8 @@ public class RecogidasController : ControllerBase
     }
 
     [HttpPut("{id:int}/estado")]
+    [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
+    [RequestSizeLimit(10 * 1024 * 1024)]
     /// <summary>
     /// Actualiza solo el estado de una recogida y registra evidencia asociada.
     /// </summary>
@@ -289,12 +308,16 @@ public class RecogidasController : ControllerBase
         string? fotoUrl = null;
         if (request.Foto is not null && request.Foto.Length > 0)
         {
+            if (!_storageService.EsImagenValida(request.Foto, out var errorImagen))
+            {
+                return BadRequest(new { mensaje = errorImagen });
+            }
+
             var uploadsRoot = _storageService.GetUploadsRootPath();
             var recogidaFolder = Path.Combine(uploadsRoot, recogida.Id.ToString());
             Directory.CreateDirectory(recogidaFolder);
 
-            var extension = Path.GetExtension(request.Foto.FileName);
-            var fileName = $"{Guid.NewGuid():N}{extension}";
+            var fileName = _storageService.GenerarNombreArchivo(request.Foto);
             var fullPath = Path.Combine(recogidaFolder, fileName);
 
             await using (var stream = new FileStream(fullPath, FileMode.Create))
@@ -343,33 +366,42 @@ public class RecogidasController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        if (request.DineroRecibido)
+        // La recogida ya quedó guardada: un fallo al notificar no debe reportarse como
+        // error al cliente ni ocultar que la operación principal sí tuvo éxito.
+        try
         {
-            await _notificacionService.EnviarNotificacionAUsuariosConPermisoAsync(
-                PermisosCatalogo.VerIngresos,
-                "Dinero recibido",
-                $"Se registró dinero en la recogida #{recogida.Id} por un total de {request.MontoCobrado?.ToString("0.00") ?? "0.00"}.",
-                "dinero_recibido",
+            if (request.DineroRecibido)
+            {
+                await _notificacionService.EnviarNotificacionAUsuariosConPermisoAsync(
+                    PermisosCatalogo.VerIngresos,
+                    "Dinero recibido",
+                    $"Se registró dinero en la recogida #{recogida.Id} por un total de {request.MontoCobrado?.ToString("0.00") ?? "0.00"}.",
+                    "dinero_recibido",
+                    recogida.Id,
+                    new Dictionary<string, string>
+                    {
+                        ["evento"] = "dinero_recibido",
+                        ["monto"] = (request.MontoCobrado ?? 0m).ToString("0.00"),
+                    },
+                    usuarioIdClaim > 0 ? usuarioIdClaim : null);
+            }
+
+            await _notificacionService.EnviarNotificacionAUsuariosOperativosAsync(
+                "Cambio de estado de recogida",
+                $"La recogida #{recogida.Id} cambió a {request.Estado}.",
+                "cambio_estado",
                 recogida.Id,
                 new Dictionary<string, string>
                 {
-                    ["evento"] = "dinero_recibido",
-                    ["monto"] = (request.MontoCobrado ?? 0m).ToString("0.00"),
+                    ["evento"] = "cambio_estado",
+                    ["estado"] = request.Estado,
                 },
                 usuarioIdClaim > 0 ? usuarioIdClaim : null);
         }
-
-        await _notificacionService.EnviarNotificacionAUsuariosOperativosAsync(
-            "Cambio de estado de recogida",
-            $"La recogida #{recogida.Id} cambió a {request.Estado}.",
-            "cambio_estado",
-            recogida.Id,
-            new Dictionary<string, string>
-            {
-                ["evento"] = "cambio_estado",
-                ["estado"] = request.Estado,
-            },
-            usuarioIdClaim > 0 ? usuarioIdClaim : null);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "No se pudieron enviar notificaciones para la recogida {RecogidaId}", recogida.Id);
+        }
 
         var actualizada = await _context.Recogidas
             .AsNoTracking()
@@ -450,6 +482,6 @@ public class RecogidasController : ControllerBase
             return false;
         }
 
-        return await new PermisosService(_context).TienePermisoAsync(usuarioIdClaim, permiso);
+        return await _permisosService.TienePermisoAsync(usuarioIdClaim, permiso);
     }
 }
