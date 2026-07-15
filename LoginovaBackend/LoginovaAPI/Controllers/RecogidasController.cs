@@ -313,16 +313,11 @@ public class RecogidasController : ControllerBase
                 return BadRequest(new { mensaje = errorImagen });
             }
 
-            var uploadsRoot = _storageService.GetUploadsRootPath();
-            var recogidaFolder = Path.Combine(uploadsRoot, recogida.Id.ToString());
-            Directory.CreateDirectory(recogidaFolder);
-
             var fileName = _storageService.GenerarNombreArchivo(request.Foto);
-            var fullPath = Path.Combine(recogidaFolder, fileName);
 
-            await using (var stream = new FileStream(fullPath, FileMode.Create))
+            await using (var stream = request.Foto.OpenReadStream())
             {
-                await request.Foto.CopyToAsync(stream);
+                await _storageService.GuardarAsync(recogida.Id, fileName, stream, request.Foto.ContentType);
             }
 
             fotoUrl = _storageService.BuildPublicUrl(Request, _storageService.BuildRelativePath(recogida.Id, fileName));

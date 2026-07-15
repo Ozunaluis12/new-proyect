@@ -17,3 +17,12 @@ $env:Smtp__EnableSsl = 'true'
 $env:Smtp__User = 'REEMPLAZAR_CON_TU_CORREO@gmail.com'
 $env:Smtp__Password = 'REEMPLAZAR_CON_CONTRASENA_DE_APLICACION'
 $env:Smtp__From = 'REEMPLAZAR_CON_TU_CORREO@gmail.com'
+
+# Cloudflare R2 para guardar evidencias (fotos) de forma persistente.
+# Opcional en desarrollo local: si se dejan vacíos, las fotos se guardan en
+# disco (App_Data/uploads) igual que antes. En producción sí son necesarios,
+# porque el disco de plataformas como Render no es persistente.
+$env:R2__AccountId = ''
+$env:R2__AccessKeyId = ''
+$env:R2__SecretAccessKey = ''
+$env:R2__BucketName = ''

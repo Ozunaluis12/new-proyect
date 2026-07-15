@@ -96,16 +96,11 @@ public class EvidenciasController : ControllerBase
             return BadRequest(new { mensaje = errorImagen });
         }
 
-        var uploadsRoot = _storageService.GetUploadsRootPath();
-        var recogidaFolder = Path.Combine(uploadsRoot, request.RecogidaId.ToString());
-        Directory.CreateDirectory(recogidaFolder);
-
         var fileName = _storageService.GenerarNombreArchivo(request.Foto);
-        var fullPath = Path.Combine(recogidaFolder, fileName);
 
-        await using (var stream = new FileStream(fullPath, FileMode.Create))
+        await using (var stream = request.Foto.OpenReadStream())
         {
-            await request.Foto.CopyToAsync(stream);
+            await _storageService.GuardarAsync(request.RecogidaId, fileName, stream, request.Foto.ContentType);
         }
 
         var relativePath = _storageService.BuildRelativePath(request.RecogidaId, fileName);

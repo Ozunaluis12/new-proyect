@@ -39,3 +39,11 @@ services:
         sync: false
       - key: Smtp__From
         sync: false
+      - key: R2__AccountId
+        sync: false
+      - key: R2__AccessKeyId
+        sync: false
+      - key: R2__SecretAccessKey
+        sync: false
+      - key: R2__BucketName
+        sync: false

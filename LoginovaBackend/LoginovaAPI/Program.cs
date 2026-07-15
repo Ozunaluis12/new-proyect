@@ -180,20 +180,18 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Las evidencias viven fuera de wwwroot a propósito: solo se sirven a través de
-// este endpoint autenticado, nunca como archivo estático público.
-app.MapGet("/uploads/{recogidaId:int}/{fileName}", (int recogidaId, string fileName, EvidenciaStorageService storage) =>
+// este endpoint autenticado, nunca como archivo estático público. El storage
+// decide internamente si el archivo vive en Cloudflare R2 o en disco local.
+app.MapGet("/uploads/{recogidaId:int}/{fileName}", async (int recogidaId, string fileName, EvidenciaStorageService storage) =>
 {
-    var root = Path.GetFullPath(storage.GetUploadsRootPath());
-    var requestedPath = Path.GetFullPath(Path.Combine(root, recogidaId.ToString(), fileName));
-
-    if (!requestedPath.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
-        !System.IO.File.Exists(requestedPath))
+    var resultado = await storage.AbrirAsync(recogidaId, fileName);
+    if (resultado is null)
     {
         return Results.NotFound();
     }
 
-    var contentType = EvidenciaStorageService.ObtenerContentType(Path.GetExtension(requestedPath));
-    return Results.File(requestedPath, contentType);
+    var (stream, contentType) = resultado.Value;
+    return Results.Stream(stream, contentType);
 }).RequireAuthorization();
 
 app.MapControllers();
