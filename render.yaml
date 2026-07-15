@@ -47,3 +47,7 @@ services:
         sync: false
       - key: R2__BucketName
         sync: false
+      - key: Resend__ApiKey
+        sync: false
+      - key: Resend__From
+        sync: false

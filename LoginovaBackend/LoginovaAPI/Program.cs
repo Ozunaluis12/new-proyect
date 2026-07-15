@@ -45,7 +45,19 @@ builder.Services.AddScoped<AuditoriaService>();
 builder.Services.AddScoped<NotificacionService>();
 builder.Services.AddScoped<EvidenciaStorageService>();
 builder.Services.AddScoped<PermisosService>();
-builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+builder.Services.AddScoped<SmtpEmailSender>();
+builder.Services.AddScoped<ResendEmailSender>();
+builder.Services.AddScoped<IEmailSender>(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+
+    // Resend viaja por HTTPS (443), que ninguna plataforma bloquea. SMTP
+    // (587/465) sí lo bloquean Render y otros PaaS gratuitos, así que queda
+    // solo como respaldo para desarrollo local, donde sí funciona.
+    return !string.IsNullOrWhiteSpace(config["Resend:ApiKey"])
+        ? sp.GetRequiredService<ResendEmailSender>()
+        : sp.GetRequiredService<SmtpEmailSender>();
+});
 
 builder.Services.AddRateLimiter(options =>
 {
