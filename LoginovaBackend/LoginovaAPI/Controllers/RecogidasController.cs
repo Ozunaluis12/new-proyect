@@ -304,11 +304,23 @@ public class RecogidasController : ControllerBase
             return NotFound();
         }
 
+        var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;
+
         var estadoAnterior = recogida.Estado;
         recogida.Estado = request.Estado;
         recogida.DineroRecibido = request.DineroRecibido;
         recogida.MontoCobrado = request.MontoCobrado;
         recogida.FormaPagoUltima = request.DineroRecibido ? request.FormaPago : null;
+
+        // El operador "dueño" de la recogida pasa a ser quien realmente hizo
+        // el cambio de estado, no quien haya quedado asignado al crearla: si
+        // el operador original no pudo pasar y otro completó la recogida, el
+        // control (y el dinero) debe quedar a nombre de quien la hizo de
+        // verdad, para no perder la trazabilidad.
+        if (usuarioIdClaim > 0)
+        {
+            recogida.UsuarioId = usuarioIdClaim;
+        }
 
         if (request.CantidadPaquetes.HasValue)
         {
@@ -352,7 +364,6 @@ public class RecogidasController : ControllerBase
             });
         }
 
-        var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;
         _context.HistorialEstados.Add(new HistorialEstado
         {
             RecogidaId = recogida.Id,
@@ -361,27 +372,20 @@ public class RecogidasController : ControllerBase
             UsuarioId = usuarioIdClaim > 0 ? usuarioIdClaim : null,
         });
 
-        if (request.DineroRecibido)
+        if (request.DineroRecibido && usuarioIdClaim > 0)
         {
-            // El dinero se atribuye al operador ASIGNADO a la recogida (quien
-            // físicamente tiene el efectivo/comprobante), no a quien haya
-            // hecho la llamada a la API — de lo contrario, si un admin o
-            // subadministrador marca el pago en nombre de un operador, el
-            // dinero quedaría mal atribuido y la caja de ese operador nunca
-            // lo mostraría como pendiente.
-            var responsableId = recogida.UsuarioId ?? (usuarioIdClaim > 0 ? usuarioIdClaim : (int?)null);
-            if (responsableId.HasValue)
+            // El dinero se atribuye a quien hace el cambio de estado (quien
+            // físicamente tiene el efectivo/comprobante en ese momento), no a
+            // quien haya quedado asignado al crear la recogida.
+            _context.Ingresos.Add(new Ingreso
             {
-                _context.Ingresos.Add(new Ingreso
-                {
-                    RecogidaId = recogida.Id,
-                    ClienteId = recogida.ClienteId,
-                    ResponsableUsuarioId = responsableId.Value,
-                    Monto = request.MontoCobrado ?? 0m,
-                    FormaPago = request.FormaPago ?? "Efectivo",
-                    FechaIngreso = DateTime.UtcNow,
-                });
-            }
+                RecogidaId = recogida.Id,
+                ClienteId = recogida.ClienteId,
+                ResponsableUsuarioId = usuarioIdClaim,
+                Monto = request.MontoCobrado ?? 0m,
+                FormaPago = request.FormaPago ?? "Efectivo",
+                FechaIngreso = DateTime.UtcNow,
+            });
         }
 
         await _context.SaveChangesAsync();
