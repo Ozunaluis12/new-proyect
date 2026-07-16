@@ -23,6 +23,20 @@ class RecogidaService {
     return data.map((item) => Recogida.fromJson(item)).toList();
   }
 
+  /// Obtiene una recogida puntual por su identificador.
+  Future<Recogida> obtenerRecogidaPorId(int id) async {
+    final response = await http.get(
+      Uri.parse('${ApiService.baseUrl}/recogidas/$id'),
+      headers: ApiService.jsonHeaders,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('No se pudo cargar la recogida');
+    }
+
+    return Recogida.fromJson(jsonDecode(response.body));
+  }
+
   /// Crea una nueva recogida en el servidor y retorna la recogida creada con ID.
   Future<Recogida> crearRecogida(Recogida recogida) async {
     final response = await http.post(
@@ -60,6 +74,7 @@ class RecogidaService {
     double? montoCobrado,
     String? formaPago,
     String? comentario,
+    int? cantidadPaquetes,
   }) async {
     final request = http.MultipartRequest(
       'PUT',
@@ -68,6 +83,9 @@ class RecogidaService {
 
     request.fields['estado'] = estado;
     request.fields['dineroRecibido'] = dineroRecibido.toString();
+    if (cantidadPaquetes != null) {
+      request.fields['cantidadPaquetes'] = cantidadPaquetes.toString();
+    }
     if (montoCobrado != null) {
       request.fields['montoCobrado'] = montoCobrado.toString();
     }
@@ -93,7 +111,14 @@ class RecogidaService {
       throw Exception('No se pudo actualizar el estado de la recogida');
     }
 
-    return Recogida.fromJson(jsonDecode(response.body));
+    // El servidor ya guardó el cambio (200 OK). Si por cualquier motivo no
+    // podemos interpretar el cuerpo de la respuesta, no reportamos un error
+    // falso: volvemos a pedir la recogida ya actualizada.
+    try {
+      return Recogida.fromJson(jsonDecode(response.body));
+    } catch (_) {
+      return obtenerRecogidaPorId(recogidaId);
+    }
   }
 
   /// Elimina una recogida del servidor por su identificador.

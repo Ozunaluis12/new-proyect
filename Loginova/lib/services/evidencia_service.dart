@@ -34,7 +34,7 @@ class EvidenciaService {
     );
 
     request.fields['recogidaId'] = evidencia.recogidaId.toString();
-    request.fields['comentario'] = evidencia.comentario;
+    request.fields['comentario'] = evidencia.comentario ?? '';
     request.files.add(await http.MultipartFile.fromPath('foto', foto.path));
 
     final token = ApiService.token;

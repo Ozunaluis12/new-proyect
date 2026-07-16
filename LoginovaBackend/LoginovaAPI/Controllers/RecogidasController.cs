@@ -65,6 +65,7 @@ public class RecogidasController : ControllerBase
         var recogidas = await _context.Recogidas
             .AsNoTracking()
             .Include(recogida => recogida.Evidencias)
+            .Include(recogida => recogida.Cliente)
             .ToListAsync();
 
         return Ok(recogidas.Select(ToResponse).ToList());
@@ -79,6 +80,7 @@ public class RecogidasController : ControllerBase
         var recogida = await _context.Recogidas
             .AsNoTracking()
             .Include(item => item.Evidencias)
+            .Include(item => item.Cliente)
             .SingleOrDefaultAsync(item => item.Id == id);
 
         return recogida is null ? NotFound() : Ok(ToResponse(recogida));
@@ -101,7 +103,8 @@ public class RecogidasController : ControllerBase
             return Forbid();
         }
 
-        if (!await _context.Clientes.AnyAsync(c => c.Id == request.ClienteId))
+        var cliente = await _context.Clientes.FindAsync(request.ClienteId);
+        if (cliente is null)
         {
             return BadRequest(new { mensaje = "Cliente no existe" });
         }
@@ -114,6 +117,7 @@ public class RecogidasController : ControllerBase
         var recogida = new Recogida
         {
             ClienteId = request.ClienteId,
+            Cliente = cliente,
             UsuarioId = request.UsuarioId,
             Estado = string.IsNullOrWhiteSpace(request.Estado) ? "Pendiente" : request.Estado,
             CantidadPaquetes = request.CantidadPaquetes,
@@ -300,6 +304,11 @@ public class RecogidasController : ControllerBase
         recogida.MontoCobrado = request.MontoCobrado;
         recogida.FormaPagoUltima = request.DineroRecibido ? request.FormaPago : null;
 
+        if (request.CantidadPaquetes.HasValue)
+        {
+            recogida.CantidadPaquetes = request.CantidadPaquetes.Value;
+        }
+
         if (string.Equals(request.Estado, "Recogida", StringComparison.OrdinalIgnoreCase))
         {
             recogida.FechaRecogida ??= DateTime.UtcNow;
@@ -401,6 +410,7 @@ public class RecogidasController : ControllerBase
         var actualizada = await _context.Recogidas
             .AsNoTracking()
             .Include(item => item.Evidencias)
+            .Include(item => item.Cliente)
             .SingleAsync(item => item.Id == id);
 
         return Ok(ToResponse(actualizada));
@@ -457,6 +467,8 @@ public class RecogidasController : ControllerBase
         return new RecogidaResponse(
             recogida.Id,
             recogida.ClienteId,
+            recogida.Cliente?.Nombre,
+            recogida.Cliente?.Telefono,
             recogida.UsuarioId,
             recogida.Estado,
             recogida.CantidadPaquetes,

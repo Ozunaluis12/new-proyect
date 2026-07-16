@@ -8,6 +8,7 @@ import '../constants/permission_constants.dart';
 import '../models/recogida.dart';
 import '../providers/auth_provider.dart';
 import '../services/recogida_service.dart';
+import '../widgets/llamar_cliente_button.dart';
 import 'registrar_ingreso_screen.dart';
 
 class CambiarEstadoRecogidaScreen extends StatefulWidget {
@@ -29,6 +30,7 @@ class _CambiarEstadoRecogidaScreenState
   ];
 
   final _comentarioController = TextEditingController();
+  final _paquetesController = TextEditingController();
   final _service = RecogidaService();
 
   File? _imagen;
@@ -42,11 +44,15 @@ class _CambiarEstadoRecogidaScreenState
     _estadoSeleccionado = _estadosPermitidos.contains(widget.recogida.estado)
         ? widget.recogida.estado
         : 'Pendiente';
+    if (widget.recogida.cantidadPaquetes > 0) {
+      _paquetesController.text = widget.recogida.cantidadPaquetes.toString();
+    }
   }
 
   @override
   void dispose() {
     _comentarioController.dispose();
+    _paquetesController.dispose();
     super.dispose();
   }
 
@@ -122,6 +128,23 @@ class _CambiarEstadoRecogidaScreenState
       return;
     }
 
+    int? cantidadPaquetes;
+    if (_estadoSeleccionado.toLowerCase() == 'recogida') {
+      cantidadPaquetes = int.tryParse(_paquetesController.text.trim());
+      if (cantidadPaquetes == null || cantidadPaquetes <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Indica cuántos paquetes recogiste antes de guardar',
+            ),
+          ),
+        );
+        return;
+      }
+    } else {
+      cantidadPaquetes = int.tryParse(_paquetesController.text.trim());
+    }
+
     setState(() => _guardando = true);
 
     try {
@@ -133,6 +156,7 @@ class _CambiarEstadoRecogidaScreenState
         montoCobrado: montoCobrado,
         formaPago: formaPago,
         comentario: _comentarioController.text.trim(),
+        cantidadPaquetes: cantidadPaquetes,
       );
 
       if (!mounted) return;
@@ -162,6 +186,11 @@ class _CambiarEstadoRecogidaScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            LlamarClienteButton(
+              nombreCliente: widget.recogida.clienteNombre,
+              telefono: widget.recogida.clienteTelefono,
+            ),
+            const SizedBox(height: 20),
             DropdownButtonFormField<String>(
               initialValue: _estadoSeleccionado,
               decoration: const InputDecoration(labelText: 'Estado'),
@@ -177,6 +206,19 @@ class _CambiarEstadoRecogidaScreenState
                       if (value == null) return;
                       setState(() => _estadoSeleccionado = value);
                     },
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _paquetesController,
+              enabled: !_guardando,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: _estadoSeleccionado.toLowerCase() == 'recogida'
+                    ? 'Cantidad de paquetes (obligatorio)'
+                    : 'Cantidad de paquetes',
+                hintText: 'Cuéntalos al recibirlos',
+                prefixIcon: const Icon(Icons.inventory_2),
+              ),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(

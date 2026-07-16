@@ -35,7 +35,6 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
   final _ciudadController = TextEditingController();
 
   // Controladores de recogida
-  final _paquetesController = TextEditingController();
   final _observacionesController = TextEditingController();
 
   // Ubicación de la recogida
@@ -54,7 +53,6 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
     _telefonoController.dispose();
     _direccionController.dispose();
     _ciudadController.dispose();
-    _paquetesController.dispose();
     _observacionesController.dispose();
     super.dispose();
   }
@@ -75,7 +73,15 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
       () async {
         if (!mounted) return;
 
-        final suggestions = await GeocodingService.searchAddresses(query);
+        final ubicacionActual = Provider.of<LocationProvider>(
+          context,
+          listen: false,
+        ).currentLocation;
+        final suggestions = await GeocodingService.searchAddresses(
+          query,
+          nearLatitude: ubicacionActual?.latitude,
+          nearLongitude: ubicacionActual?.longitude,
+        );
 
         if (!mounted) return;
 
@@ -97,7 +103,15 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
     setState(() => _isSearchingAddress = true);
 
     try {
-      final location = await GeocodingService.geocodeAddress(query);
+      final ubicacionActual = Provider.of<LocationProvider>(
+        context,
+        listen: false,
+      ).currentLocation;
+      final location = await GeocodingService.geocodeAddress(
+        query,
+        nearLatitude: ubicacionActual?.latitude,
+        nearLongitude: ubicacionActual?.longitude,
+      );
 
       if (!mounted) return;
 
@@ -244,16 +258,15 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
         ),
       );
 
-      // Crear recogida con ubicación
-      final cantidadPaquetes =
-          int.tryParse(_paquetesController.text.trim()) ?? 1;
-
+      // Crear recogida con ubicación. La cantidad de paquetes se desconoce
+      // en este punto: la registra el operador al cambiar el estado, cuando
+      // ya tiene los paquetes en mano y puede contarlos con certeza.
       final recogida = Recogida(
         id: 0,
         clienteId: cliente.id,
         usuarioId: auth.usuario!.id,
         estado: 'Pendiente',
-        cantidadPaquetes: cantidadPaquetes,
+        cantidadPaquetes: 0,
         observaciones: _observacionesController.text.trim(),
         evidencias: const [],
         latitud: _selectedLatitude,
@@ -560,27 +573,6 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
     return Column(
       children: [
         TextFormField(
-          controller: _paquetesController,
-          textInputAction: TextInputAction.next,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Cantidad de Paquetes',
-            hintText: 'Ej: 5',
-            prefixIcon: const Icon(Icons.inventory_2),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Por favor ingresa la cantidad de paquetes';
-            }
-            final cantidad = int.tryParse(value);
-            if (cantidad == null || cantidad <= 0) {
-              return 'Ingresa un número válido mayor a 0';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
           controller: _observacionesController,
           textInputAction: TextInputAction.done,
           maxLines: 3,
@@ -681,7 +673,11 @@ class _LocationPickerScreenState extends State<_LocationPickerScreen> {
     setState(() => _isSearchingLocation = true);
 
     try {
-      final location = await GeocodingService.geocodeAddress(query);
+      final location = await GeocodingService.geocodeAddress(
+        query,
+        nearLatitude: _centerLocation.latitude,
+        nearLongitude: _centerLocation.longitude,
+      );
       if (!mounted) return;
 
       if (location != null) {

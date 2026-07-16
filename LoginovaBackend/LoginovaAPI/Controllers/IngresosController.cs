@@ -13,6 +13,9 @@ namespace LoginovaAPI.Controllers;
 [Route("api/[controller]")]
 public class IngresosController : ControllerBase
 {
+    // Colombia no observa horario de verano: el offset es fijo todo el año.
+    private static readonly TimeSpan ZonaHorariaNegocio = TimeSpan.FromHours(-5);
+
     private readonly AppDbContext _context;
     private readonly PermisosService _permisosService;
 
@@ -20,6 +23,20 @@ public class IngresosController : ControllerBase
     {
         _context = context;
         _permisosService = permisosService;
+    }
+
+    /// <summary>
+    /// Convierte una fecha de calendario (sin importar su Kind original) en el
+    /// rango [inicio, fin) en UTC que corresponde a ese día completo en la
+    /// zona horaria del negocio. Evita que ingresos registrados de noche
+    /// (hora local) queden fuera del cierre de caja del día correcto.
+    /// </summary>
+    private static (DateTime DesdeUtc, DateTime HastaUtc) RangoDiaEnUtc(DateTime fecha)
+    {
+        var dia = fecha.Date;
+        var desdeUtc = new DateTimeOffset(dia, ZonaHorariaNegocio).UtcDateTime;
+        var hastaUtc = new DateTimeOffset(dia.AddDays(1), ZonaHorariaNegocio).UtcDateTime;
+        return (desdeUtc, hastaUtc);
     }
 
     [HttpGet]
@@ -49,24 +66,22 @@ public class IngresosController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(cliente))
         {
-            query = query.Where(item => item.Cliente != null && item.Cliente.Nombre.Contains(cliente));
+            query = query.Where(item => item.Cliente != null && EF.Functions.ILike(item.Cliente.Nombre, $"%{cliente}%"));
         }
 
         if (!string.IsNullOrWhiteSpace(operador))
         {
-            query = query.Where(item => item.ResponsableUsuario != null && item.ResponsableUsuario.Nombre.Contains(operador));
+            query = query.Where(item => item.ResponsableUsuario != null && EF.Functions.ILike(item.ResponsableUsuario.Nombre, $"%{operador}%"));
         }
 
         if (fechaDesde.HasValue)
         {
-            var desdeUtc = fechaDesde.Value.Date.ToUniversalTime();
-            query = query.Where(item => item.FechaIngreso >= desdeUtc);
+            query = query.Where(item => item.FechaIngreso >= RangoDiaEnUtc(fechaDesde.Value).DesdeUtc);
         }
 
         if (fechaHasta.HasValue)
         {
-            var hastaUtc = fechaHasta.Value.Date.AddDays(1).ToUniversalTime();
-            query = query.Where(item => item.FechaIngreso < hastaUtc);
+            query = query.Where(item => item.FechaIngreso < RangoDiaEnUtc(fechaHasta.Value).HastaUtc);
         }
 
         var ingresos = await query
@@ -112,24 +127,22 @@ public class IngresosController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(cliente))
         {
-            query = query.Where(item => item.Cliente != null && item.Cliente.Nombre.Contains(cliente));
+            query = query.Where(item => item.Cliente != null && EF.Functions.ILike(item.Cliente.Nombre, $"%{cliente}%"));
         }
 
         if (!string.IsNullOrWhiteSpace(operador))
         {
-            query = query.Where(item => item.ResponsableUsuario != null && item.ResponsableUsuario.Nombre.Contains(operador));
+            query = query.Where(item => item.ResponsableUsuario != null && EF.Functions.ILike(item.ResponsableUsuario.Nombre, $"%{operador}%"));
         }
 
         if (fechaDesde.HasValue)
         {
-            var desdeUtc = fechaDesde.Value.Date.ToUniversalTime();
-            query = query.Where(item => item.FechaIngreso >= desdeUtc);
+            query = query.Where(item => item.FechaIngreso >= RangoDiaEnUtc(fechaDesde.Value).DesdeUtc);
         }
 
         if (fechaHasta.HasValue)
         {
-            var hastaUtc = fechaHasta.Value.Date.AddDays(1).ToUniversalTime();
-            query = query.Where(item => item.FechaIngreso < hastaUtc);
+            query = query.Where(item => item.FechaIngreso < RangoDiaEnUtc(fechaHasta.Value).HastaUtc);
         }
 
         var ingresos = await query.ToListAsync();
@@ -191,8 +204,7 @@ public class IngresosController : ControllerBase
         }
 
         var date = fecha?.Date ?? DateTime.UtcNow.Date;
-        var desdeUtc = date.ToUniversalTime();
-        var hastaUtc = date.AddDays(1).ToUniversalTime();
+        var (desdeUtc, hastaUtc) = RangoDiaEnUtc(date);
 
         var ingresosQuery = _context.Set<Models.Ingreso>()
             .AsNoTracking()
@@ -227,8 +239,7 @@ public class IngresosController : ControllerBase
             return Conflict(new { mensaje = "La caja de ese operador ya fue cerrada para esa fecha" });
         }
 
-        var desdeUtc = date.ToUniversalTime();
-        var hastaUtc = date.AddDays(1).ToUniversalTime();
+        var (desdeUtc, hastaUtc) = RangoDiaEnUtc(date);
 
         var ingresos = await _context.Set<Models.Ingreso>()
             .Where(i => i.ResponsableUsuarioId == request.OperadorId && i.FechaIngreso >= desdeUtc && i.FechaIngreso < hastaUtc)

@@ -85,17 +85,43 @@ class AuthProvider extends ChangeNotifier {
     return true;
   }
 
-  /// Restablece la contraseña de un usuario mediante el endpoint de backend.
-  Future<bool> resetPassword(String correo, String password) async {
+  /// Solicita el código de recuperación de contraseña al correo indicado.
+  Future<bool> solicitarCodigoRecuperacion(String correo) async {
     _cargando = true;
     _error = null;
     notifyListeners();
 
-    final success = await _authService.forgotPassword(correo, password);
+    final success = await _authService.forgotPassword(correo);
     _cargando = false;
 
     if (!success) {
-      _error = 'No se pudo restablecer la contraseña';
+      _error = 'No se pudo enviar el código. Intenta nuevamente.';
+      notifyListeners();
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Verifica el código recibido y establece la nueva contraseña.
+  Future<bool> resetPassword(
+    String correo,
+    String codigo,
+    String nuevaPassword,
+  ) async {
+    _cargando = true;
+    _error = null;
+    notifyListeners();
+
+    final success = await _authService.resetPassword(
+      correo,
+      codigo,
+      nuevaPassword,
+    );
+    _cargando = false;
+
+    if (!success) {
+      _error = 'Código inválido o expirado';
       notifyListeners();
       return false;
     }

@@ -40,7 +40,7 @@ class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
       text: widget.recogida.cantidadPaquetes.toString(),
     );
     observacionesController = TextEditingController(
-      text: widget.recogida.observaciones,
+      text: widget.recogida.observaciones ?? '',
     );
   }
 

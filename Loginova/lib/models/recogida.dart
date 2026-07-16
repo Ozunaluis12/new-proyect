@@ -2,10 +2,12 @@
 class Recogida {
   final int id;
   final int clienteId;
-  final int usuarioId;
+  final String? clienteNombre;
+  final String? clienteTelefono;
+  final int? usuarioId;
   final String estado;
   final int cantidadPaquetes;
-  final String observaciones;
+  final String? observaciones;
   final List<String> evidencias;
   final bool dineroRecibido;
   final double? montoCobrado;
@@ -17,10 +19,12 @@ class Recogida {
   Recogida({
     required this.id,
     required this.clienteId,
-    required this.usuarioId,
+    this.clienteNombre,
+    this.clienteTelefono,
+    this.usuarioId,
     required this.estado,
     required this.cantidadPaquetes,
-    required this.observaciones,
+    this.observaciones,
     required this.evidencias,
     this.dineroRecibido = false,
     this.montoCobrado,
@@ -34,6 +38,8 @@ class Recogida {
     return Recogida(
       id: json['id'],
       clienteId: json['clienteId'],
+      clienteNombre: json['clienteNombre'],
+      clienteTelefono: json['clienteTelefono'],
       usuarioId: json['usuarioId'],
       estado: json['estado'],
       cantidadPaquetes: json['cantidadPaquetes'],

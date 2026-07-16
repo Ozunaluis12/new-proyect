@@ -281,7 +281,7 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
               const SizedBox(height: 8),
 
               // Observaciones
-              if (recogida.observaciones.isNotEmpty) ...[
+              if ((recogida.observaciones ?? '').isNotEmpty) ...[
                 Row(
                   children: [
                     Icon(
@@ -292,7 +292,7 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        recogida.observaciones,
+                        recogida.observaciones!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(

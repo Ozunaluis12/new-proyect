@@ -328,7 +328,10 @@ class _MapaScreenState extends State<MapaScreen> {
 
               // Detalles de la recogida
               _buildDetailRow('Cliente ID', '#${recogida.clienteId}'),
-              _buildDetailRow('Operador ID', '#${recogida.usuarioId}'),
+              _buildDetailRow(
+                'Operador ID',
+                recogida.usuarioId != null ? '#${recogida.usuarioId}' : 'Sin asignar',
+              ),
               _buildDetailRow(
                 'Cantidad de paquetes',
                 '${recogida.cantidadPaquetes}',
@@ -341,9 +344,9 @@ class _MapaScreenState extends State<MapaScreen> {
                 ),
               ],
 
-              if (recogida.observaciones.isNotEmpty) ...[
+              if ((recogida.observaciones ?? '').isNotEmpty) ...[
                 const SizedBox(height: 12),
-                _buildDetailRow('Observaciones', recogida.observaciones),
+                _buildDetailRow('Observaciones', recogida.observaciones!),
               ],
 
               const SizedBox(height: 20),
@@ -416,14 +419,15 @@ class _MapaScreenState extends State<MapaScreen> {
               proximityProvider,
               _,
             ) {
-              // Programar actualización de marcadores con debounce
-              if (recogidaProvider.recogidas.isNotEmpty) {
-                _scheduleMarkersUpdate(
-                  recogidaProvider.recogidas,
-                  proximityProvider.proximities,
-                  locationProvider.currentLocation,
-                );
-              }
+              // Programar actualización de marcadores con debounce. Se llama
+              // siempre (incluso sin recogidas) para que la ubicación del
+              // operador se muestre de inmediato, no solo cuando ya existe
+              // al menos una recogida.
+              _scheduleMarkersUpdate(
+                recogidaProvider.recogidas,
+                proximityProvider.proximities,
+                locationProvider.currentLocation,
+              );
 
               return Stack(
                 children: [

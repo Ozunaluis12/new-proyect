@@ -64,12 +64,33 @@ class AuthService {
     return AuthResult(token: token, usuario: usuario);
   }
 
-  /// Solicita el restablecimiento de contraseña en el backend.
-  Future<bool> forgotPassword(String correo, String password) async {
+  /// Solicita el código de recuperación de contraseña por correo.
+  /// Siempre responde 200 (exista o no el correo), para no revelar qué
+  /// correos están registrados.
+  Future<bool> forgotPassword(String correo) async {
     final response = await http.post(
       Uri.parse('${ApiService.baseUrl}/auth/forgot-password'),
       headers: ApiService.jsonHeaders,
-      body: jsonEncode({'correo': correo, 'password': password}),
+      body: jsonEncode({'correo': correo}),
+    );
+
+    return response.statusCode == 200;
+  }
+
+  /// Verifica el código recibido por correo y establece la nueva contraseña.
+  Future<bool> resetPassword(
+    String correo,
+    String codigo,
+    String nuevaPassword,
+  ) async {
+    final response = await http.post(
+      Uri.parse('${ApiService.baseUrl}/auth/reset-password'),
+      headers: ApiService.jsonHeaders,
+      body: jsonEncode({
+        'correo': correo,
+        'token': codigo,
+        'nuevaPassword': nuevaPassword,
+      }),
     );
 
     return response.statusCode == 204;

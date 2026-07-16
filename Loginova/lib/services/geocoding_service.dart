@@ -10,16 +10,37 @@ import 'location_service.dart';
 class GeocodingService {
   static const _baseUrl = 'https://nominatim.openstreetmap.org';
 
-  static Uri buildSearchUri(String query, {int limit = 4}) {
-    return Uri.parse('$_baseUrl/search').replace(
-      queryParameters: {
-        'format': 'jsonv2',
-        'limit': limit.toString(),
-        'q': query,
-        'addressdetails': '1',
-        'accept-language': 'es',
-      },
-    );
+  // Medio grado de latitud/longitud equivale a ~55km en el ecuador: suficiente
+  // para cubrir una ciudad y sus alrededores sin restringir de más.
+  static const double _nearbyBoxDegrees = 0.5;
+
+  static Uri buildSearchUri(
+    String query, {
+    int limit = 4,
+    double? nearLatitude,
+    double? nearLongitude,
+  }) {
+    final params = <String, String>{
+      'format': 'jsonv2',
+      'limit': limit.toString(),
+      'q': query,
+      'addressdetails': '1',
+      'accept-language': 'es',
+    };
+
+    if (nearLatitude != null && nearLongitude != null) {
+      // Sesga los resultados hacia la zona donde está el usuario, para que una
+      // dirección genérica (ej. "Calle 10 # 5-20") no traiga coincidencias en
+      // otro país. No es una restricción dura: si no hay nada cerca, Nominatim
+      // igual puede devolver resultados fuera de la caja.
+      final minLon = nearLongitude - _nearbyBoxDegrees;
+      final maxLon = nearLongitude + _nearbyBoxDegrees;
+      final minLat = nearLatitude - _nearbyBoxDegrees;
+      final maxLat = nearLatitude + _nearbyBoxDegrees;
+      params['viewbox'] = '$minLon,$maxLat,$maxLon,$minLat';
+    }
+
+    return Uri.parse('$_baseUrl/search').replace(queryParameters: params);
   }
 
   static Uri buildReverseGeocodeUri(double latitude, double longitude) {
@@ -34,11 +55,20 @@ class GeocodingService {
   }
 
   /// Convierte una dirección de texto a coordenadas (Geocodificación Directa).
-  static Future<LocationData?> geocodeAddress(String address) async {
+  static Future<LocationData?> geocodeAddress(
+    String address, {
+    double? nearLatitude,
+    double? nearLongitude,
+  }) async {
     try {
       if (address.isEmpty) return null;
 
-      final uri = buildSearchUri(address, limit: 3);
+      final uri = buildSearchUri(
+        address,
+        limit: 3,
+        nearLatitude: nearLatitude,
+        nearLongitude: nearLongitude,
+      );
 
       final response = await http.get(
         uri,
@@ -93,11 +123,20 @@ class GeocodingService {
   }
 
   /// Obtiene múltiples direcciones candidatas para una búsqueda.
-  static Future<List<String>> searchAddresses(String query) async {
+  static Future<List<String>> searchAddresses(
+    String query, {
+    double? nearLatitude,
+    double? nearLongitude,
+  }) async {
     try {
       if (query.isEmpty) return [];
 
-      final uri = buildSearchUri(query, limit: 4);
+      final uri = buildSearchUri(
+        query,
+        limit: 4,
+        nearLatitude: nearLatitude,
+        nearLongitude: nearLongitude,
+      );
 
       final response = await http.get(
         uri,

@@ -18,6 +18,14 @@ public class ActualizarEstadoRecogidaRequest
     [Required]
     public string Estado { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Cantidad real de paquetes, contada por el operador al recoger. Es
+    /// opcional porque no todos los cambios de estado implican un conteo
+    /// (por ejemplo, cancelar no requiere actualizarla).
+    /// </summary>
+    [Range(0, int.MaxValue)]
+    public int? CantidadPaquetes { get; set; }
+
     public string? FotoUrl { get; set; }
 
     public string? Comentario { get; set; }
@@ -34,6 +42,8 @@ public class ActualizarEstadoRecogidaRequest
 public record RecogidaResponse(
     int Id,
     int ClienteId,
+    string? ClienteNombre,
+    string? ClienteTelefono,
     int? UsuarioId,
     string Estado,
     int CantidadPaquetes,

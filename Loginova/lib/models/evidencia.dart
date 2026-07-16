@@ -3,14 +3,14 @@ class Evidencia {
   final int id;
   final int recogidaId;
   final String fotoUrl;
-  final String comentario;
+  final String? comentario;
 
   /// Constructor que requiere todos los campos de una evidencia.
   Evidencia({
     required this.id,
     required this.recogidaId,
     required this.fotoUrl,
-    required this.comentario,
+    this.comentario,
   });
 
   /// Crea una instancia desde un JSON devuelto por el servidor.

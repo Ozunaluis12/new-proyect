@@ -15,10 +15,12 @@ class SeguridadScreen extends StatefulWidget {
 class _SeguridadScreenState extends State<SeguridadScreen> {
   final _formKey = GlobalKey<FormState>();
   final _correoController = TextEditingController();
+  final _codigoController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   bool _mostrarPassword = false;
   bool _mostrarConfirm = false;
+  bool _codigoEnviado = false;
 
   @override
   void didChangeDependencies() {
@@ -37,9 +39,37 @@ class _SeguridadScreenState extends State<SeguridadScreen> {
   @override
   void dispose() {
     _correoController.dispose();
+    _codigoController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
     super.dispose();
+  }
+
+  Future<void> _enviarCodigo() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final ok = await auth.solicitarCodigoRecuperacion(
+      _correoController.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    if (ok) {
+      setState(() => _codigoEnviado = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Te enviamos un código de verificación al correo'),
+          backgroundColor: LoginovaColors.success,
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(auth.error ?? 'No se pudo enviar el código'),
+        backgroundColor: LoginovaColors.error,
+      ),
+    );
   }
 
   Future<void> _actualizarPassword() async {
@@ -58,14 +88,17 @@ class _SeguridadScreenState extends State<SeguridadScreen> {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final ok = await auth.resetPassword(
       _correoController.text.trim(),
+      _codigoController.text.trim(),
       _passwordController.text,
     );
 
     if (!mounted) return;
 
     if (ok) {
+      _codigoController.clear();
       _passwordController.clear();
       _confirmController.clear();
+      setState(() => _codigoEnviado = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Contraseña actualizada correctamente'),
@@ -104,12 +137,15 @@ class _SeguridadScreenState extends State<SeguridadScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Esta acción utiliza el flujo de recuperación seguro del backend.',
+                      _codigoEnviado
+                          ? 'Ingresa el código que enviamos a tu correo y tu nueva contraseña.'
+                          : 'Te enviaremos un código de verificación a tu correo para confirmar el cambio.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 24),
                     TextFormField(
                       controller: _correoController,
+                      enabled: !_codigoEnviado,
                       decoration: const InputDecoration(
                         labelText: 'Correo',
                         prefixIcon: Icon(Icons.email_outlined),
@@ -117,6 +153,43 @@ class _SeguridadScreenState extends State<SeguridadScreen> {
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Ingresa un correo';
+                        }
+                        return null;
+                      },
+                    ),
+                    if (!_codigoEnviado) ...[
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: auth.cargando ? null : _enviarCodigo,
+                          icon: auth.cargando
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.send),
+                          label: const Text('Enviar código'),
+                        ),
+                      ),
+                    ],
+                    if (_codigoEnviado) ...[
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _codigoController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      decoration: const InputDecoration(
+                        labelText: 'Código de verificación',
+                        counterText: '',
+                        prefixIcon: Icon(Icons.pin_outlined),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().length != 6) {
+                          return 'Ingresa el código de 6 dígitos';
                         }
                         return null;
                       },
@@ -193,6 +266,7 @@ class _SeguridadScreenState extends State<SeguridadScreen> {
                         label: const Text('Actualizar contraseña'),
                       ),
                     ),
+                    ],
                   ],
                 ),
               ),

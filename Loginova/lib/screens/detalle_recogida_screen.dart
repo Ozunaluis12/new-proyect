@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../constants/permission_constants.dart';
 import '../models/recogida.dart';
 import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
 import '../themes/app_theme.dart';
+import '../widgets/llamar_cliente_button.dart';
 import 'cambiar_estado_recogida_screen.dart';
 import 'editar_recogida_screen.dart';
 import 'evidencia_screen.dart';
@@ -167,11 +169,18 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
                     child: _buildDetailItem(
                       icon: Icons.engineering,
                       label: 'Operador ID',
-                      value: '#${_recogida.usuarioId}',
+                      value: _recogida.usuarioId != null
+                          ? '#${_recogida.usuarioId}'
+                          : 'Sin asignar',
                       color: LoginovaColors.secondary,
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              LlamarClienteButton(
+                nombreCliente: _recogida.clienteNombre,
+                telefono: _recogida.clienteTelefono,
               ),
               const SizedBox(height: 24),
 
@@ -190,7 +199,7 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
               const SizedBox(height: 24),
 
               // Observaciones
-              if (_recogida.observaciones.isNotEmpty) ...[
+              if ((_recogida.observaciones ?? '').isNotEmpty) ...[
                 _buildSectionTitle('Observaciones'),
                 const SizedBox(height: 12),
                 _buildObservacionesCard(),
@@ -455,7 +464,7 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              _recogida.observaciones,
+              _recogida.observaciones ?? '',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
@@ -521,6 +530,10 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
               Image.network(
                 url,
                 fit: BoxFit.cover,
+                headers: {
+                  if (ApiService.token != null)
+                    'Authorization': 'Bearer ${ApiService.token}',
+                },
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     color: LoginovaColors.background,

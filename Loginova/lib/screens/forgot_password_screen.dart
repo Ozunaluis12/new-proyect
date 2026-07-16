@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../themes/app_theme.dart';
 
-/// Pantalla profesional para restablecer la contraseña de un usuario registrado.
+/// Pantalla de recuperación de contraseña en dos pasos: primero se solicita
+/// un código por correo, luego se verifica ese código y se define la nueva
+/// contraseña.
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -12,26 +14,63 @@ class ForgotPasswordScreen extends StatefulWidget {
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
+enum _PasoRecuperacion { correo, codigo }
+
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final _formKey = GlobalKey<FormState>();
+  final _formKeyCorreo = GlobalKey<FormState>();
+  final _formKeyCodigo = GlobalKey<FormState>();
+
   final _correoController = TextEditingController();
+  final _codigoController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  _PasoRecuperacion _paso = _PasoRecuperacion.correo;
   bool _mostrarPassword = false;
   bool _mostrarConfirmPassword = false;
 
   @override
   void dispose() {
     _correoController.dispose();
+    _codigoController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  /// Valida y envía el formulario de restablecimiento
+  Future<void> _solicitarCodigo() async {
+    if (!_formKeyCorreo.currentState!.validate()) return;
+
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final exito = await auth.solicitarCodigoRecuperacion(
+      _correoController.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    if (exito) {
+      setState(() => _paso = _PasoRecuperacion.codigo);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Si el correo está registrado, te enviamos un código de recuperación.',
+          ),
+          backgroundColor: LoginovaColors.success,
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(auth.error ?? 'No se pudo enviar el código'),
+        backgroundColor: LoginovaColors.error,
+      ),
+    );
+  }
+
   Future<void> _restablecer() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKeyCodigo.currentState!.validate()) return;
 
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -46,6 +85,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final exito = await auth.resetPassword(
       _correoController.text.trim(),
+      _codigoController.text.trim(),
       _passwordController.text,
     );
 
@@ -84,37 +124,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             horizontal: isMobile ? 20 : 40,
             vertical: 20,
           ),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
-
-                // Encabezado
-                _buildHeader(),
-                const SizedBox(height: 40),
-
-                // Formulario
-                _buildForm(),
-                const SizedBox(height: 32),
-
-                // Botones de acción
-                _buildActionButtons(),
-                const SizedBox(height: 16),
-
-                // Link a login
-                _buildLoginLink(),
-              ],
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 20),
+              _buildHeader(),
+              const SizedBox(height: 40),
+              if (_paso == _PasoRecuperacion.correo)
+                _buildPasoCorreo()
+              else
+                _buildPasoCodigo(),
+              const SizedBox(height: 16),
+              _buildLoginLink(),
+            ],
           ),
         ),
       ),
     );
   }
 
-  /// Construye el encabezado
   Widget _buildHeader() {
+    final esPasoCorreo = _paso == _PasoRecuperacion.correo;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -126,21 +156,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
-            Icons.lock_reset,
+            esPasoCorreo ? Icons.lock_reset : Icons.mark_email_read_outlined,
             color: LoginovaColors.warning,
             size: 30,
           ),
         ),
         const SizedBox(height: 20),
         Text(
-          'Restablecer tu contraseña',
+          esPasoCorreo ? 'Restablecer tu contraseña' : 'Ingresa el código',
           style: Theme.of(
             context,
           ).textTheme.displaySmall?.copyWith(color: LoginovaColors.primary),
         ),
         const SizedBox(height: 8),
         Text(
-          'Ingresa tu correo y define una nueva contraseña',
+          esPasoCorreo
+              ? 'Ingresa tu correo y te enviaremos un código de recuperación'
+              : 'Revisa tu correo (${_correoController.text.trim()}) e ingresa el código de 6 dígitos junto con tu nueva contraseña',
           style: Theme.of(
             context,
           ).textTheme.bodyLarge?.copyWith(color: LoginovaColors.textSecondary),
@@ -149,145 +181,203 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  /// Construye el formulario
-  Widget _buildForm() {
-    return Column(
-      children: [
-        // Campo de correo
-        TextFormField(
-          controller: _correoController,
-          textInputAction: TextInputAction.next,
-          keyboardType: TextInputType.emailAddress,
-          decoration: InputDecoration(
-            labelText: 'Correo Electrónico',
-            hintText: 'tu@email.com',
-            prefixIcon: const Icon(Icons.email_outlined),
-            prefixIconColor: LoginovaColors.primary,
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Por favor ingresa tu correo';
-            }
-            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(value)) {
-              return 'Por favor ingresa un correo válido';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-
-        // Campo de nueva contraseña
-        TextFormField(
-          controller: _passwordController,
-          textInputAction: TextInputAction.next,
-          obscureText: !_mostrarPassword,
-          decoration: InputDecoration(
-            labelText: 'Nueva Contraseña',
-            hintText: '••••••••',
-            prefixIcon: const Icon(Icons.lock_outlined),
-            prefixIconColor: LoginovaColors.primary,
-            suffixIcon: IconButton(
-              icon: Icon(
-                _mostrarPassword ? Icons.visibility : Icons.visibility_off,
-                color: LoginovaColors.textSecondary,
-              ),
-              onPressed: () =>
-                  setState(() => _mostrarPassword = !_mostrarPassword),
+  Widget _buildPasoCorreo() {
+    return Form(
+      key: _formKeyCorreo,
+      child: Column(
+        children: [
+          TextFormField(
+            controller: _correoController,
+            textInputAction: TextInputAction.done,
+            keyboardType: TextInputType.emailAddress,
+            onFieldSubmitted: (_) => _solicitarCodigo(),
+            decoration: InputDecoration(
+              labelText: 'Correo Electrónico',
+              hintText: 'tu@email.com',
+              prefixIcon: const Icon(Icons.email_outlined),
+              prefixIconColor: LoginovaColors.primary,
             ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Por favor ingresa tu correo';
+              }
+              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(value)) {
+                return 'Por favor ingresa un correo válido';
+              }
+              return null;
+            },
           ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Por favor ingresa una contraseña';
-            }
-            if (value.length < 6) {
-              return 'La contraseña debe tener al menos 6 caracteres';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-
-        // Campo de confirmación de contraseña
-        TextFormField(
-          controller: _confirmPasswordController,
-          textInputAction: TextInputAction.done,
-          obscureText: !_mostrarConfirmPassword,
-          onFieldSubmitted: (_) => _restablecer(),
-          decoration: InputDecoration(
-            labelText: 'Confirmar Nueva Contraseña',
-            hintText: '••••••••',
-            prefixIcon: const Icon(Icons.lock_outlined),
-            prefixIconColor: LoginovaColors.primary,
-            suffixIcon: IconButton(
-              icon: Icon(
-                _mostrarConfirmPassword
-                    ? Icons.visibility
-                    : Icons.visibility_off,
-                color: LoginovaColors.textSecondary,
-              ),
-              onPressed: () => setState(
-                () => _mostrarConfirmPassword = !_mostrarConfirmPassword,
-              ),
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Por favor confirma tu contraseña';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  /// Construye los botones de acción
-  Widget _buildActionButtons() {
-    return Consumer<AuthProvider>(
-      builder: (context, auth, _) {
-        return Column(
-          children: [
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: auth.cargando ? null : _restablecer,
-                child: auth.cargando
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
+          const SizedBox(height: 32),
+          Consumer<AuthProvider>(
+            builder: (context, auth, _) {
+              return SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: auth.cargando ? null : _solicitarCodigo,
+                  child: auth.cargando
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Text(
+                          'Enviar código',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      )
-                    : const Text(
-                        'Restablecer Contraseña',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancelar'),
-              ),
-            ),
-          ],
-        );
-      },
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
-  /// Construye el link a login
+  Widget _buildPasoCodigo() {
+    return Form(
+      key: _formKeyCodigo,
+      child: Column(
+        children: [
+          TextFormField(
+            controller: _codigoController,
+            textInputAction: TextInputAction.next,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            decoration: const InputDecoration(
+              labelText: 'Código de recuperación',
+              hintText: '123456',
+              counterText: '',
+              prefixIcon: Icon(Icons.pin_outlined),
+              prefixIconColor: LoginovaColors.primary,
+            ),
+            validator: (value) {
+              if (value == null || value.trim().length != 6) {
+                return 'Ingresa el código de 6 dígitos que te enviamos';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _passwordController,
+            textInputAction: TextInputAction.next,
+            obscureText: !_mostrarPassword,
+            decoration: InputDecoration(
+              labelText: 'Nueva Contraseña',
+              hintText: '••••••••',
+              prefixIcon: const Icon(Icons.lock_outlined),
+              prefixIconColor: LoginovaColors.primary,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _mostrarPassword ? Icons.visibility : Icons.visibility_off,
+                  color: LoginovaColors.textSecondary,
+                ),
+                onPressed: () =>
+                    setState(() => _mostrarPassword = !_mostrarPassword),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Por favor ingresa una contraseña';
+              }
+              if (value.length < 8) {
+                return 'La contraseña debe tener al menos 8 caracteres';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _confirmPasswordController,
+            textInputAction: TextInputAction.done,
+            obscureText: !_mostrarConfirmPassword,
+            onFieldSubmitted: (_) => _restablecer(),
+            decoration: InputDecoration(
+              labelText: 'Confirmar Nueva Contraseña',
+              hintText: '••••••••',
+              prefixIcon: const Icon(Icons.lock_outlined),
+              prefixIconColor: LoginovaColors.primary,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _mostrarConfirmPassword
+                      ? Icons.visibility
+                      : Icons.visibility_off,
+                  color: LoginovaColors.textSecondary,
+                ),
+                onPressed: () => setState(
+                  () => _mostrarConfirmPassword = !_mostrarConfirmPassword,
+                ),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Por favor confirma tu contraseña';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 32),
+          Consumer<AuthProvider>(
+            builder: (context, auth, _) {
+              return Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: auth.cargando ? null : _restablecer,
+                      child: auth.cargando
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text(
+                              'Restablecer Contraseña',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: auth.cargando
+                          ? null
+                          : () => setState(() {
+                              _paso = _PasoRecuperacion.correo;
+                              _codigoController.clear();
+                            }),
+                      child: const Text('Usar otro correo'),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLoginLink() {
     return Center(
       child: Row(
