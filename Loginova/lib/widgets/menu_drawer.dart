@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../constants/permission_constants.dart';
 import '../providers/auth_provider.dart';
 import '../themes/app_theme.dart';
 
@@ -15,6 +16,8 @@ class MenuDrawer extends StatelessWidget {
     final auth = Provider.of<AuthProvider>(context);
     final usuario = auth.usuario;
     final isAdmin = usuario?.rol.toLowerCase() == 'administrador';
+    final puedeVerCierres =
+        isAdmin || (usuario?.tienePermiso(PermissionConstants.verIngresos) ?? false);
 
     return Drawer(
       child: SafeArea(
@@ -83,6 +86,13 @@ class MenuDrawer extends StatelessWidget {
                       '/auditoria',
                       Icons.fact_check,
                       'Auditoría',
+                    ),
+                  if (puedeVerCierres)
+                    _buildTile(
+                      context,
+                      '/historial-cierres',
+                      Icons.point_of_sale,
+                      'Historial de cierres',
                     ),
                 ],
               ),

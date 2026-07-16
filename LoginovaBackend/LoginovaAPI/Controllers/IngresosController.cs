@@ -18,11 +18,13 @@ public class IngresosController : ControllerBase
 
     private readonly AppDbContext _context;
     private readonly PermisosService _permisosService;
+    private readonly IConfiguration _configuration;
 
-    public IngresosController(AppDbContext context, PermisosService permisosService)
+    public IngresosController(AppDbContext context, PermisosService permisosService, IConfiguration configuration)
     {
         _context = context;
         _permisosService = permisosService;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -39,6 +41,21 @@ public class IngresosController : ControllerBase
         return (desdeUtc, hastaUtc);
     }
 
+    /// <summary>Fecha de calendario "de hoy" en la zona horaria del negocio.</summary>
+    private static DateTime HoyNegocio()
+    {
+        // DateTimeOffset.Date siempre devuelve Kind=Unspecified, pero Npgsql
+        // exige Kind=Utc para "timestamp with time zone". El valor ya está
+        // calculado en la zona horaria correcta; solo falta marcarlo como Utc.
+        var fechaLocal = DateTimeOffset.UtcNow.ToOffset(ZonaHorariaNegocio).Date;
+        return DateTime.SpecifyKind(fechaLocal, DateTimeKind.Utc);
+    }
+
+    private async Task<int> UsuarioIdActualAsync()
+    {
+        return await Task.FromResult(int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0);
+    }
+
     [HttpGet]
     public async Task<ActionResult<List<IngresoResponse>>> GetAll(
         [FromQuery] string? cliente,
@@ -46,7 +63,7 @@ public class IngresosController : ControllerBase
         [FromQuery] DateTime? fechaDesde,
         [FromQuery] DateTime? fechaHasta)
     {
-        var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;
+        var usuarioIdClaim = await UsuarioIdActualAsync();
         if (usuarioIdClaim == 0)
         {
             return Forbid();
@@ -107,7 +124,7 @@ public class IngresosController : ControllerBase
         [FromQuery] DateTime? fechaDesde,
         [FromQuery] DateTime? fechaHasta)
     {
-        var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;
+        var usuarioIdClaim = await UsuarioIdActualAsync();
         if (usuarioIdClaim == 0)
         {
             return Forbid();
@@ -185,14 +202,11 @@ public class IngresosController : ControllerBase
         return File(bytes, "text/csv; charset=utf-8", fileName);
     }
 
-    public record CierreCajaRequest(int OperadorId, DateTime Fecha, string? Observaciones);
-
-    [HttpGet("resumen-caja")]
-    public async Task<ActionResult<object>> ResumenCaja(
-        [FromQuery] int operadorId,
-        [FromQuery] DateTime? fecha)
+    /// <summary>Operadores y subadministradores que pueden tener caja (para el selector de cierre).</summary>
+    [HttpGet("operadores")]
+    public async Task<ActionResult<List<OperadorDisponibleResponse>>> OperadoresDisponibles()
     {
-        var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;
+        var usuarioIdClaim = await UsuarioIdActualAsync();
         if (usuarioIdClaim == 0)
         {
             return Forbid();
@@ -203,79 +217,308 @@ public class IngresosController : ControllerBase
             return Forbid();
         }
 
-        var date = fecha?.Date ?? DateTime.UtcNow.Date;
-        var (desdeUtc, hastaUtc) = RangoDiaEnUtc(date);
-
-        var ingresosQuery = _context.Set<Models.Ingreso>()
+        var operadores = await _context.Usuarios
             .AsNoTracking()
-            .Where(i => i.ResponsableUsuarioId == operadorId && i.FechaIngreso >= desdeUtc && i.FechaIngreso < hastaUtc);
-
-        var total = await ingresosQuery.SumAsync(i => (decimal?)i.Monto) ?? 0m;
-        var count = await ingresosQuery.CountAsync();
-
-        return Ok(new { OperadorId = operadorId, Fecha = date, Total = total, Count = count });
-    }
-
-    [HttpPost("cierre")]
-    public async Task<IActionResult> CerrarCaja([FromBody] CierreCajaRequest request)
-    {
-        var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;
-        if (usuarioIdClaim == 0)
-        {
-            return Forbid();
-        }
-
-        if (!await _permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
-        {
-            return Forbid();
-        }
-
-        var date = request.Fecha.Date;
-
-        var yaExiste = await _context.Set<Models.CierreCaja>()
-            .AnyAsync(c => c.OperadorId == request.OperadorId && c.Fecha == date);
-        if (yaExiste)
-        {
-            return Conflict(new { mensaje = "La caja de ese operador ya fue cerrada para esa fecha" });
-        }
-
-        var (desdeUtc, hastaUtc) = RangoDiaEnUtc(date);
-
-        var ingresos = await _context.Set<Models.Ingreso>()
-            .Where(i => i.ResponsableUsuarioId == request.OperadorId && i.FechaIngreso >= desdeUtc && i.FechaIngreso < hastaUtc)
+            .Include(u => u.Role)
+            .Where(u => u.Activo && u.Role != null && PermisosCatalogo.RolesGestion.Contains(u.Role.Nombre))
+            .OrderBy(u => u.Nombre)
+            .Select(u => new OperadorDisponibleResponse(u.Id, u.Nombre, u.Role!.Nombre))
             .ToListAsync();
 
-        var montoTotal = ingresos.Sum(i => i.Monto);
+        return Ok(operadores);
+    }
 
-        var cierre = new Models.CierreCaja
+    /// <summary>Dinero pendiente por cerrar de un operador: lo que aún no está en ningún cierre.</summary>
+    [HttpGet("resumen-caja")]
+    public async Task<ActionResult<ResumenCajaResponse>> ResumenCaja([FromQuery] int operadorId)
+    {
+        var usuarioIdClaim = await UsuarioIdActualAsync();
+        if (usuarioIdClaim == 0)
         {
-            OperadorId = request.OperadorId,
-            Fecha = date,
-            MontoTotal = montoTotal,
-            Observaciones = request.Observaciones,
-            CreadoPor = usuarioIdClaim,
-            FechaCreacion = DateTime.UtcNow
-        };
-
-        _context.Add(cierre);
-
-        try
-        {
-            await _context.SaveChangesAsync();
+            return Forbid();
         }
-        catch (DbUpdateException)
-        {
-            var yaExisteAhora = await _context.Set<Models.CierreCaja>()
-                .AnyAsync(c => c.OperadorId == request.OperadorId && c.Fecha == date);
-            if (yaExisteAhora)
-            {
-                // Otra petición concurrente ganó la carrera y ya cerró esta caja.
-                return Conflict(new { mensaje = "La caja de ese operador ya fue cerrada para esa fecha" });
-            }
 
-            throw;
+        if (!await _permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
+        {
+            return Forbid();
+        }
+
+        var operador = await _context.Usuarios.FindAsync(operadorId);
+        if (operador is null)
+        {
+            return NotFound(new { mensaje = "Operador no existe" });
+        }
+
+        var pendientes = await _context.Set<Models.Ingreso>()
+            .AsNoTracking()
+            .Include(i => i.Cliente)
+            .Where(i => i.ResponsableUsuarioId == operadorId && i.CierreCajaId == null)
+            .OrderByDescending(i => i.FechaIngreso)
+            .ToListAsync();
+
+        var detalle = pendientes
+            .Select(i => new IngresoDetalleResponse(
+                i.Id,
+                i.Cliente != null ? i.Cliente.Nombre : string.Empty,
+                i.Monto,
+                i.FormaPago,
+                i.FechaIngreso))
+            .ToList();
+
+        var totalEfectivo = pendientes.Where(i => string.Equals(i.FormaPago, "Efectivo", StringComparison.OrdinalIgnoreCase)).Sum(i => i.Monto);
+        var totalTransferencia = pendientes.Where(i => string.Equals(i.FormaPago, "Transferencia", StringComparison.OrdinalIgnoreCase)).Sum(i => i.Monto);
+
+        return Ok(new ResumenCajaResponse(
+            operadorId,
+            operador.Nombre,
+            totalEfectivo + totalTransferencia,
+            totalEfectivo,
+            totalTransferencia,
+            pendientes.Count,
+            detalle));
+    }
+
+    /// <summary>
+    /// Cierra la caja de un operador: recoge todos sus ingresos aún no
+    /// cerrados en un nuevo registro de cierre, con desglose por forma de pago.
+    /// </summary>
+    [HttpPost("cierre")]
+    public async Task<ActionResult<CierreCajaResponse>> CerrarCaja([FromBody] CerrarCajaRequest request)
+    {
+        var usuarioIdClaim = await UsuarioIdActualAsync();
+        if (usuarioIdClaim == 0)
+        {
+            return Forbid();
+        }
+
+        if (!await _permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.CerrarCaja))
+        {
+            return Forbid();
+        }
+
+        if (!await _context.Usuarios.AnyAsync(u => u.Id == request.OperadorId))
+        {
+            return BadRequest(new { mensaje = "Operador no existe" });
+        }
+
+        var cierre = await CerrarCajaOperadorAsync(request.OperadorId, usuarioIdClaim, automatico: false, request.Observaciones);
+        if (cierre is null)
+        {
+            return BadRequest(new { mensaje = "Ese operador no tiene ingresos pendientes por cerrar" });
         }
 
         return Ok(cierre);
+    }
+
+    /// <summary>
+    /// Disparado por un cron externo (GitHub Actions) a las 11:59pm hora de
+    /// Colombia. Cierra automáticamente la caja de cualquier operador que
+    /// tenga dinero pendiente, para que todos empiecen el día siguiente en
+    /// ceros aunque el administrador haya olvidado cerrar manualmente.
+    /// No usa JWT (no hay un usuario logueado en un cron): se valida con un
+    /// secreto compartido en el header X-Cron-Secret.
+    /// </summary>
+    [HttpPost("cierre-automatico")]
+    [AllowAnonymous]
+    public async Task<IActionResult> CierreAutomatico([FromHeader(Name = "X-Cron-Secret")] string? secret)
+    {
+        var secretoEsperado = _configuration["CierreAutomatico:Secret"];
+        if (string.IsNullOrWhiteSpace(secretoEsperado) || !string.Equals(secret, secretoEsperado, StringComparison.Ordinal))
+        {
+            return Unauthorized();
+        }
+
+        var operadoresConPendientes = await _context.Set<Models.Ingreso>()
+            .Where(i => i.CierreCajaId == null)
+            .Select(i => i.ResponsableUsuarioId)
+            .Distinct()
+            .ToListAsync();
+
+        var cierres = new List<CierreCajaResponse>();
+        foreach (var operadorId in operadoresConPendientes)
+        {
+            var cierre = await CerrarCajaOperadorAsync(
+                operadorId,
+                creadoPor: 0,
+                automatico: true,
+                observaciones: "Cierre automático (11:59pm Colombia)");
+
+            if (cierre is not null)
+            {
+                cierres.Add(cierre);
+            }
+        }
+
+        return Ok(new { cierresGenerados = cierres.Count, cierres });
+    }
+
+    /// <summary>Historial de cierres de caja, con filtros opcionales.</summary>
+    [HttpGet("cierres")]
+    public async Task<ActionResult<List<CierreCajaResponse>>> HistorialCierres(
+        [FromQuery] int? operadorId,
+        [FromQuery] DateTime? fechaDesde,
+        [FromQuery] DateTime? fechaHasta)
+    {
+        var usuarioIdClaim = await UsuarioIdActualAsync();
+        if (usuarioIdClaim == 0)
+        {
+            return Forbid();
+        }
+
+        if (!await _permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
+        {
+            return Forbid();
+        }
+
+        var query = _context.Set<Models.CierreCaja>()
+            .AsNoTracking()
+            .Include(c => c.Operador)
+            .OrderByDescending(c => c.FechaCreacion)
+            .AsQueryable();
+
+        if (operadorId.HasValue)
+        {
+            query = query.Where(c => c.OperadorId == operadorId.Value);
+        }
+
+        if (fechaDesde.HasValue)
+        {
+            query = query.Where(c => c.Fecha >= fechaDesde.Value.Date);
+        }
+
+        if (fechaHasta.HasValue)
+        {
+            query = query.Where(c => c.Fecha <= fechaHasta.Value.Date);
+        }
+
+        var cierres = await query
+            .Select(c => new CierreCajaResponse(
+                c.Id,
+                c.OperadorId,
+                c.Operador != null ? c.Operador.Nombre : string.Empty,
+                c.Fecha,
+                c.MontoTotal,
+                c.MontoEfectivo,
+                c.MontoTransferencia,
+                c.Observaciones,
+                c.GeneradoAutomaticamente,
+                c.CreadoPor,
+                c.FechaCreacion,
+                null))
+            .ToListAsync();
+
+        return Ok(cierres);
+    }
+
+    /// <summary>Detalle de un cierre puntual, incluyendo los ingresos que recogió.</summary>
+    [HttpGet("cierres/{id:int}")]
+    public async Task<ActionResult<CierreCajaResponse>> DetalleCierre(int id)
+    {
+        var usuarioIdClaim = await UsuarioIdActualAsync();
+        if (usuarioIdClaim == 0)
+        {
+            return Forbid();
+        }
+
+        if (!await _permisosService.TienePermisoAsync(usuarioIdClaim, PermisosCatalogo.VerIngresos))
+        {
+            return Forbid();
+        }
+
+        var cierre = await _context.Set<Models.CierreCaja>()
+            .AsNoTracking()
+            .Include(c => c.Operador)
+            .Include(c => c.Ingresos)
+            .ThenInclude(i => i.Cliente)
+            .SingleOrDefaultAsync(c => c.Id == id);
+
+        if (cierre is null)
+        {
+            return NotFound();
+        }
+
+        var detalle = cierre.Ingresos
+            .OrderByDescending(i => i.FechaIngreso)
+            .Select(i => new IngresoDetalleResponse(
+                i.Id,
+                i.Cliente != null ? i.Cliente.Nombre : string.Empty,
+                i.Monto,
+                i.FormaPago,
+                i.FechaIngreso))
+            .ToList();
+
+        return Ok(new CierreCajaResponse(
+            cierre.Id,
+            cierre.OperadorId,
+            cierre.Operador?.Nombre ?? string.Empty,
+            cierre.Fecha,
+            cierre.MontoTotal,
+            cierre.MontoEfectivo,
+            cierre.MontoTransferencia,
+            cierre.Observaciones,
+            cierre.GeneradoAutomaticamente,
+            cierre.CreadoPor,
+            cierre.FechaCreacion,
+            detalle));
+    }
+
+    /// <summary>
+    /// Recoge todos los ingresos aún no cerrados de un operador en un nuevo
+    /// CierreCaja. Devuelve null si no había nada pendiente (no crea cierres
+    /// vacíos), tanto para el cierre manual como para el automático.
+    /// </summary>
+    private async Task<CierreCajaResponse?> CerrarCajaOperadorAsync(
+        int operadorId,
+        int creadoPor,
+        bool automatico,
+        string? observaciones)
+    {
+        var pendientes = await _context.Set<Models.Ingreso>()
+            .Where(i => i.ResponsableUsuarioId == operadorId && i.CierreCajaId == null)
+            .ToListAsync();
+
+        if (pendientes.Count == 0)
+        {
+            return null;
+        }
+
+        var totalEfectivo = pendientes.Where(i => string.Equals(i.FormaPago, "Efectivo", StringComparison.OrdinalIgnoreCase)).Sum(i => i.Monto);
+        var totalTransferencia = pendientes.Where(i => string.Equals(i.FormaPago, "Transferencia", StringComparison.OrdinalIgnoreCase)).Sum(i => i.Monto);
+
+        var cierre = new Models.CierreCaja
+        {
+            OperadorId = operadorId,
+            Fecha = HoyNegocio(),
+            MontoTotal = totalEfectivo + totalTransferencia,
+            MontoEfectivo = totalEfectivo,
+            MontoTransferencia = totalTransferencia,
+            Observaciones = observaciones,
+            CreadoPor = creadoPor,
+            GeneradoAutomaticamente = automatico,
+            FechaCreacion = DateTime.UtcNow,
+        };
+
+        foreach (var ingreso in pendientes)
+        {
+            ingreso.CierreCaja = cierre;
+        }
+
+        _context.Add(cierre);
+        await _context.SaveChangesAsync();
+
+        var operador = await _context.Usuarios.FindAsync(operadorId);
+
+        return new CierreCajaResponse(
+            cierre.Id,
+            cierre.OperadorId,
+            operador?.Nombre ?? string.Empty,
+            cierre.Fecha,
+            cierre.MontoTotal,
+            cierre.MontoEfectivo,
+            cierre.MontoTransferencia,
+            cierre.Observaciones,
+            cierre.GeneradoAutomaticamente,
+            cierre.CreadoPor,
+            cierre.FechaCreacion);
     }
 }

@@ -11,6 +11,9 @@ class PermissionConstants {
   static const String gestionarNotificaciones = 'gestionar_notificaciones';
   static const String verUbicaciones = 'ver_ubicaciones';
   static const String gestionarUbicaciones = 'gestionar_ubicaciones';
+  static const String verClientes = 'ver_clientes';
+  static const String gestionarClientes = 'gestionar_clientes';
+  static const String cerrarCaja = 'cerrar_caja';
 
   static const List<String> all = [
     crearRecogidas,
@@ -19,12 +22,15 @@ class PermissionConstants {
     subirEvidencias,
     registrarIngresos,
     verIngresos,
+    cerrarCaja,
     verUsuarios,
     gestionarUsuarios,
     verAuditoria,
     gestionarNotificaciones,
     verUbicaciones,
     gestionarUbicaciones,
+    verClientes,
+    gestionarClientes,
   ];
 
   static const Map<String, String> labels = {
@@ -34,11 +40,14 @@ class PermissionConstants {
     subirEvidencias: 'Subir evidencias',
     registrarIngresos: 'Registrar ingresos del cliente',
     verIngresos: 'Ver historial de ingresos',
+    cerrarCaja: 'Cerrar caja (propia o de otros)',
     verUsuarios: 'Ver usuarios',
     gestionarUsuarios: 'Gestionar usuarios',
     verAuditoria: 'Ver auditoría',
     gestionarNotificaciones: 'Gestionar notificaciones',
     verUbicaciones: 'Ver ubicaciones',
     gestionarUbicaciones: 'Gestionar ubicaciones',
+    verClientes: 'Ver clientes',
+    gestionarClientes: 'Gestionar clientes',
   };
 }

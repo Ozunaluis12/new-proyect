@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 
+import '../models/cierre_caja.dart';
 import '../models/ingreso.dart';
 import '../services/ingreso_service.dart';
 
@@ -54,22 +55,31 @@ class IngresosProvider extends ChangeNotifier {
     );
   }
 
-  Future<Map<String, dynamic>> resumenCaja(
-    int operadorId,
-    DateTime fecha,
-  ) async {
-    return await _service.resumenCaja(operadorId, fecha);
+  Future<List<OperadorDisponible>> obtenerOperadoresDisponibles() async {
+    return await _service.obtenerOperadoresDisponibles();
   }
 
-  Future<void> cerrarCaja(
-    int operadorId,
-    DateTime fecha, {
-    String? observaciones,
+  Future<ResumenCaja> resumenCaja(int operadorId) async {
+    return await _service.resumenCaja(operadorId);
+  }
+
+  Future<CierreCaja> cerrarCaja(int operadorId, {String? observaciones}) async {
+    return await _service.cerrarCaja(operadorId, observaciones: observaciones);
+  }
+
+  Future<List<CierreCaja>> obtenerHistorialCierres({
+    int? operadorId,
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
   }) async {
-    return await _service.cerrarCaja(
-      operadorId,
-      fecha,
-      observaciones: observaciones,
+    return await _service.obtenerHistorialCierres(
+      operadorId: operadorId,
+      fechaDesde: fechaDesde,
+      fechaHasta: fechaHasta,
     );
+  }
+
+  Future<CierreCaja> obtenerDetalleCierre(int id) async {
+    return await _service.obtenerDetalleCierre(id);
   }
 }

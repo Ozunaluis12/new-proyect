@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/ingreso.dart';
 import '../providers/ingresos_provider.dart';
 import '../themes/app_theme.dart';
+import 'cerrar_caja_screen.dart';
 
 class _ResumenMonto {
   final String nombre;
@@ -102,97 +103,18 @@ class _IngresosAdminTabState extends State<IngresosAdminTab> {
     }
   }
 
-  Future<void> _mostrarDialogoCerrarCaja() async {
-    final provider = Provider.of<IngresosProvider>(context, listen: false);
-    final ingresos = provider.ingresos;
-    final operadores = <Map<String, dynamic>>[];
-
-    for (final ingreso in ingresos) {
-      if (!operadores.any((o) => o['id'] == ingreso.responsableUsuarioId)) {
-        operadores.add({
-          'id': ingreso.responsableUsuarioId,
-          'nombre': ingreso.responsableNombre,
-        });
-      }
-    }
-
-    int? selectedOperadorId = operadores.isNotEmpty
-        ? operadores.first['id'] as int
-        : null;
-    DateTime fecha = DateTime.now();
-
-    final outerContext = context;
-    await showDialog(
-      context: outerContext,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Cerrar caja'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (operadores.isEmpty)
-                const Text(
-                  'No hay operadores visibles en los filtros actuales.',
-                )
-              else ...[
-                DropdownButton<int>(
-                  value: selectedOperadorId,
-                  items: operadores
-                      .map(
-                        (o) => DropdownMenuItem<int>(
-                          value: o['id'] as int,
-                          child: Text(o['nombre'] as String),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => selectedOperadorId = v,
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final f = await showDatePicker(
-                      context: dialogContext,
-                      initialDate: fecha,
-                      firstDate: DateTime(2024),
-                      lastDate: DateTime(2100),
-                    );
-                    if (f != null) fecha = f;
-                  },
-                  icon: const Icon(Icons.date_range),
-                  label: Text('${fecha.day}/${fecha.month}/${fecha.year}'),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (selectedOperadorId == null) return;
-                try {
-                  await provider.cerrarCaja(selectedOperadorId!, fecha);
-                  Navigator.of(dialogContext).pop();
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(outerContext).showSnackBar(
-                    const SnackBar(content: Text('Caja cerrada correctamente')),
-                  );
-                  await _cargar();
-                } catch (e) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(outerContext).showSnackBar(
-                    SnackBar(content: Text('Error cerrando caja: $e')),
-                  );
-                }
-              },
-              child: const Text('Cerrar'),
-            ),
-          ],
-        );
-      },
+  Future<void> _abrirCerrarCaja() async {
+    final cierre = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CerrarCajaScreen()),
     );
+
+    if (cierre != null && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Caja cerrada correctamente')));
+      await _cargar();
+    }
   }
 
   @override
@@ -873,7 +795,7 @@ class _IngresosAdminTabState extends State<IngresosAdminTab> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _mostrarDialogoCerrarCaja,
+                    onPressed: _abrirCerrarCaja,
                     icon: const Icon(Icons.lock_clock),
                     label: const Text('Cerrar caja'),
                   ),

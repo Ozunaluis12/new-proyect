@@ -31,4 +31,10 @@ public class Ingreso
 
     [Column("fecha_ingreso")]
     public DateTime FechaIngreso { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Cierre de caja que recogió este ingreso. Null mientras esté pendiente.</summary>
+    [Column("cierre_caja_id")]
+    public int? CierreCajaId { get; set; }
+
+    public CierreCaja? CierreCaja { get; set; }
 }

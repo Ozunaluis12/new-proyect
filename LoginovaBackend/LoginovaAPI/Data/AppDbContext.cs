@@ -96,7 +96,8 @@ public class AppDbContext : DbContext
                 new Permiso { Id = 11, Nombre = PermisosCatalogo.VerUbicaciones, Descripcion = "Ver ubicaciones de operadores" },
                 new Permiso { Id = 12, Nombre = PermisosCatalogo.GestionarUbicaciones, Descripcion = "Gestionar ubicaciones de operadores" },
                 new Permiso { Id = 13, Nombre = PermisosCatalogo.VerClientes, Descripcion = "Ver clientes del sistema" },
-                new Permiso { Id = 14, Nombre = PermisosCatalogo.GestionarClientes, Descripcion = "Crear, editar y eliminar clientes" });
+                new Permiso { Id = 14, Nombre = PermisosCatalogo.GestionarClientes, Descripcion = "Crear, editar y eliminar clientes" },
+                new Permiso { Id = 15, Nombre = PermisosCatalogo.CerrarCaja, Descripcion = "Cerrar la caja de un operador o subadministrador" });
 
         modelBuilder.Entity<Ubicacion>().ToTable("ubicaciones");
         modelBuilder.Entity<HistorialEstado>().ToTable("historial_estados");
@@ -120,21 +121,26 @@ public class AppDbContext : DbContext
             .HasForeignKey(historial => historial.RecogidaId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        var passwordHasher = new PasswordHasher();
         modelBuilder.Entity<Usuario>()
             .HasOne(usuario => usuario.Role)
             .WithMany(role => role.Usuarios)
             .HasForeignKey(usuario => usuario.RoleId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Hash y fecha fijos a propósito (no PasswordHasher.Hash()/DateTime.UtcNow):
+        // si el seed fuera no-determinista, cada "dotnet ef migrations add" futuro
+        // generaría una migración espuria que reescribe la contraseña del admin
+        // en producción de vuelta a "admin123", borrando cualquier cambio real.
+        // Hash de "admin123" con salt fijo, solo para este registro semilla.
         modelBuilder.Entity<Usuario>().HasData(new Usuario
         {
             Id = 1,
             Nombre = "Administrador",
             Correo = "admin@loginova.com",
-            Password = passwordHasher.Hash("admin123"),
+            Password = "pbkdf2$100000$TG9naW5vdmFTZWVkRml4ZQ==$uGONhA2zkb6zwPFQW3QzzJvOXsdfz88ogmVTbETi7Kw=",
             RoleId = 1,
             PermisosJson = "[]",
+            FechaCreacion = new DateTime(2026, 6, 22, 0, 0, 0, DateTimeKind.Utc),
         });
 
         modelBuilder.Entity<Recogida>()
@@ -180,10 +186,17 @@ public class AppDbContext : DbContext
             .HasForeignKey(c => c.OperadorId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Evita cierres de caja duplicados para el mismo operador/día.
+        // Un cierre "recoge" los ingresos aún no cerrados de un operador; no hay
+        // límite de uno por día porque puede haber un cierre manual a mitad de
+        // día y luego el cierre automático nocturno recogiendo el resto.
         modelBuilder.Entity<CierreCaja>()
-            .HasIndex(c => new { c.OperadorId, c.Fecha })
-            .IsUnique();
+            .HasIndex(c => new { c.OperadorId, c.Fecha });
+
+        modelBuilder.Entity<Ingreso>()
+            .HasOne(i => i.CierreCaja)
+            .WithMany(c => c.Ingresos)
+            .HasForeignKey(i => i.CierreCajaId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<PasswordResetToken>().ToTable("password_reset_tokens");
         modelBuilder.Entity<PasswordResetToken>()

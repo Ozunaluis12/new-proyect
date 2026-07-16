@@ -16,6 +16,7 @@ import '../screens/seguridad_screen.dart';
 import '../screens/acerca_screen.dart';
 import '../screens/auditoria_screen.dart';
 import '../screens/historial_estados_screen.dart';
+import '../screens/historial_cierres_screen.dart';
 
 /// Definición de todas las rutas nombradas de la aplicación.
 class AppRoutes {
@@ -68,5 +69,8 @@ class AppRoutes {
     ),
     '/admin': _adminGuard((context) => const AdminDashboardScreen()),
     '/auditoria': _adminGuard((context) => const AuditoriaScreen()),
+    '/historial-cierres': _authGuard(
+      (context) => const HistorialCierresScreen(),
+    ),
   };
 }

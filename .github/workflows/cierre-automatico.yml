@@ -1,0 +1,21 @@
+name: Cierre automático de caja
+
+# 23:59 hora de Colombia (UTC-5, sin horario de verano) = 04:59 UTC del día
+# siguiente. Se dispara desde aquí en vez de un temporizador dentro del
+# backend porque Render (plan gratis) apaga el servidor por inactividad, y
+# un timer interno no se ejecutaría si el proceso está dormido a esa hora.
+# Esta petición HTTP despierta el servidor si hace falta.
+on:
+  schedule:
+    - cron: "59 4 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  cerrar-caja:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar cierre automático
+        run: |
+          curl -sf -X POST "https://loginova-api.onrender.com/api/ingresos/cierre-automatico" \
+            -H "X-Cron-Secret: ${{ secrets.CIERRE_AUTOMATICO_SECRET }}" \
+            --max-time 90
