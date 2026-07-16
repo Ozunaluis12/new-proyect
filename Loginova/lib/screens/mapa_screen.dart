@@ -7,8 +7,10 @@ import 'package:provider/provider.dart';
 import '../models/recogida.dart';
 import '../providers/recogida_provider.dart';
 import '../providers/location_provider.dart';
+import '../providers/maps_provider.dart';
 import '../providers/proximity_provider.dart';
 import '../services/location_service.dart';
+import '../services/maps_service.dart' as maps_service;
 import '../services/proximity_service.dart';
 import '../themes/app_theme.dart';
 import '../utils/app_logger.dart';
@@ -29,6 +31,10 @@ class _MapaScreenState extends State<MapaScreen> {
   LocationData? _operatorLocation;
   bool _showOperatorMarker = false;
   Timer? _markerDebounce;
+
+  List<LatLng> _rutaPuntos = [];
+  maps_service.RouteInfo? _rutaInfo;
+  bool _calculandoRuta = false;
 
   // Ubicación por defecto mientras carga el GPS (usada solo como fallback)
   static const LatLng _ubicacionFallback = LatLng(6.2442, -75.5812);
@@ -273,6 +279,71 @@ class _MapaScreenState extends State<MapaScreen> {
     }
   }
 
+  /// Calcula y dibuja en el mapa la ruta desde la ubicación actual hasta una
+  /// recogida (usa OSRM, la misma fuente gratuita que ya usa el resto del
+  /// mapa; nunca sale de la app hacia Google Maps ni otra app externa).
+  Future<void> _calcularRuta(Recogida recogida) async {
+    if (recogida.latitud == null || recogida.longitud == null) return;
+
+    final ubicacionActual = _operatorLocation;
+    if (ubicacionActual == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activa el GPS para calcular cómo llegar'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _calculandoRuta = true);
+
+    final mapsProvider = Provider.of<MapsProvider>(context, listen: false);
+    final exito = await mapsProvider.getRoute(
+      origin: maps_service.LatLng(
+        latitude: ubicacionActual.latitude,
+        longitude: ubicacionActual.longitude,
+      ),
+      destination: maps_service.LatLng(
+        latitude: recogida.latitud!,
+        longitude: recogida.longitud!,
+      ),
+    );
+
+    if (!mounted) return;
+    setState(() => _calculandoRuta = false);
+
+    if (!exito || mapsProvider.currentRoute == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo calcular la ruta')),
+      );
+      return;
+    }
+
+    final ruta = mapsProvider.currentRoute!;
+    final puntos = ruta.points
+        .map((p) => LatLng(p.latitude, p.longitude))
+        .toList();
+
+    setState(() {
+      _rutaInfo = ruta;
+      _rutaPuntos = puntos;
+    });
+
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds.fromPoints(puntos),
+        padding: const EdgeInsets.all(60),
+      ),
+    );
+  }
+
+  void _limpiarRuta() {
+    setState(() {
+      _rutaInfo = null;
+      _rutaPuntos = [];
+    });
+  }
+
   /// Muestra detalles de recogida con información de proximidad
   void _mostrarDetallesRecogida(
     Recogida recogida,
@@ -359,6 +430,20 @@ class _MapaScreenState extends State<MapaScreen> {
               ],
 
               const SizedBox(height: 20),
+              if (recogida.latitud != null && recogida.longitud != null) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _calcularRuta(recogida);
+                    },
+                    icon: const Icon(Icons.directions),
+                    label: const Text('Cómo llegar'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -457,6 +542,16 @@ class _MapaScreenState extends State<MapaScreen> {
                             'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         userAgentPackageName: 'com.loginova.app',
                       ),
+                      if (_rutaPuntos.isNotEmpty)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: _rutaPuntos,
+                              strokeWidth: 5,
+                              color: LoginovaColors.primary,
+                            ),
+                          ],
+                        ),
                       MarkerLayer(markers: _markers),
                     ],
                   ),
@@ -517,6 +612,68 @@ class _MapaScreenState extends State<MapaScreen> {
                             ),
                           ],
                         ),
+                      ),
+                    ),
+
+                  // Tarjeta de ruta activa (distancia, tiempo, cancelar)
+                  if (_rutaInfo != null)
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 20,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.directions,
+                              color: LoginovaColors.primary,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${_rutaInfo!.distanceKm.toStringAsFixed(1)} km · ${_rutaInfo!.durationFormatted}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const Text(
+                                    'Ruta hacia la recogida',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              tooltip: 'Cancelar ruta',
+                              onPressed: _limpiarRuta,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  if (_calculandoRuta)
+                    const Center(
+                      child: CircularProgressIndicator(
+                        backgroundColor: Colors.white,
                       ),
                     ),
 

@@ -5,14 +5,197 @@ import 'package:http/http.dart' as http;
 import '../utils/app_logger.dart';
 import 'location_service.dart';
 
+/// Una dirección sugerida por el buscador, con sus coordenadas ya resueltas
+/// (para no tener que volver a geocodificar cuando el usuario la selecciona).
+class AddressSuggestion {
+  final String label;
+  final double latitude;
+  final double longitude;
+
+  AddressSuggestion({
+    required this.label,
+    required this.latitude,
+    required this.longitude,
+  });
+}
+
 /// Servicio especializado para geocodificación y reverse geocodificación.
-/// Usa Nominatim (OpenStreetMap) como respaldo robusto para desktop y móvil.
+///
+/// Usa Mapbox cuando hay un access token configurado (mejor cobertura de
+/// direcciones exactas en Colombia, con autocompletado tipo Google Maps).
+/// Si no hay token, cae a Nominatim (OpenStreetMap): sigue funcionando sin
+/// configuración adicional, pero con menos precisión a nivel de predio.
 class GeocodingService {
-  static const _baseUrl = 'https://nominatim.openstreetmap.org';
+  static const _nominatimBaseUrl = 'https://nominatim.openstreetmap.org';
+  static const _mapboxBaseUrl =
+      'https://api.mapbox.com/geocoding/v5/mapbox.places';
+
+  static const String _mapboxToken = String.fromEnvironment(
+    'MAPBOX_ACCESS_TOKEN',
+    defaultValue: '',
+  );
+
+  static bool get usaMapbox => _mapboxToken.isNotEmpty;
 
   // Medio grado de latitud/longitud equivale a ~55km en el ecuador: suficiente
   // para cubrir una ciudad y sus alrededores sin restringir de más.
   static const double _nearbyBoxDegrees = 0.5;
+
+  /// Obtiene múltiples direcciones candidatas para una búsqueda, con sus
+  /// coordenadas ya resueltas.
+  static Future<List<AddressSuggestion>> searchAddresses(
+    String query, {
+    double? nearLatitude,
+    double? nearLongitude,
+  }) async {
+    if (query.isEmpty) return [];
+
+    return usaMapbox
+        ? _searchMapbox(
+            query,
+            limit: 5,
+            nearLatitude: nearLatitude,
+            nearLongitude: nearLongitude,
+          )
+        : _searchNominatim(
+            query,
+            limit: 4,
+            nearLatitude: nearLatitude,
+            nearLongitude: nearLongitude,
+          );
+  }
+
+  /// Convierte una dirección de texto a coordenadas (Geocodificación Directa).
+  static Future<LocationData?> geocodeAddress(
+    String address, {
+    double? nearLatitude,
+    double? nearLongitude,
+  }) async {
+    if (address.isEmpty) return null;
+
+    final resultados = await searchAddresses(
+      address,
+      nearLatitude: nearLatitude,
+      nearLongitude: nearLongitude,
+    );
+    if (resultados.isEmpty) return null;
+
+    final primero = resultados.first;
+    return LocationData(
+      latitude: primero.latitude,
+      longitude: primero.longitude,
+      accuracy: 0,
+      timestamp: DateTime.now(),
+    );
+  }
+
+  /// Convierte coordenadas a dirección legible (Reverse Geocodificación).
+  static Future<String?> reverseGeocode(
+    double latitude,
+    double longitude,
+  ) async {
+    return usaMapbox
+        ? _reverseMapbox(latitude, longitude)
+        : _reverseNominatim(latitude, longitude);
+  }
+
+  /// Valida si una dirección es válida y retorna sus coordenadas.
+  static Future<bool> validateAddress(String address) async {
+    final location = await geocodeAddress(address);
+    return location != null;
+  }
+
+  // ---------------------------------------------------------------------
+  // Mapbox
+  // ---------------------------------------------------------------------
+
+  static Future<List<AddressSuggestion>> _searchMapbox(
+    String query, {
+    required int limit,
+    double? nearLatitude,
+    double? nearLongitude,
+  }) async {
+    try {
+      final params = <String, String>{
+        'access_token': _mapboxToken,
+        'autocomplete': 'true',
+        'language': 'es',
+        'country': 'co',
+        'limit': limit.toString(),
+      };
+
+      if (nearLatitude != null && nearLongitude != null) {
+        params['proximity'] = '$nearLongitude,$nearLatitude';
+      }
+
+      final uri = Uri.parse(
+        '$_mapboxBaseUrl/${Uri.encodeComponent(query)}.json',
+      ).replace(queryParameters: params);
+
+      final response = await http.get(uri);
+      if (response.statusCode != 200) {
+        AppLogger.warn('Mapbox geocoding falló: ${response.statusCode}');
+        return [];
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final features = data['features'] as List<dynamic>? ?? [];
+
+      return features
+          .map((item) => _mapboxFeatureToSuggestion(item as Map<String, dynamic>))
+          .whereType<AddressSuggestion>()
+          .toList();
+    } catch (e) {
+      AppLogger.warn('Error en búsqueda Mapbox: $e', error: e);
+      return [];
+    }
+  }
+
+  static Future<String?> _reverseMapbox(double latitude, double longitude) async {
+    try {
+      final uri = Uri.parse(
+        '$_mapboxBaseUrl/$longitude,$latitude.json',
+      ).replace(
+        queryParameters: {'access_token': _mapboxToken, 'language': 'es'},
+      );
+
+      final response = await http.get(uri);
+      if (response.statusCode != 200) {
+        AppLogger.warn(
+          'Mapbox reverse geocoding falló: ${response.statusCode}',
+        );
+        return null;
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final features = data['features'] as List<dynamic>? ?? [];
+      if (features.isEmpty) return null;
+
+      return (features.first as Map<String, dynamic>)['place_name']
+          ?.toString();
+    } catch (e) {
+      AppLogger.warn('Error en reverse geocoding Mapbox: $e', error: e);
+      return null;
+    }
+  }
+
+  static AddressSuggestion? _mapboxFeatureToSuggestion(
+    Map<String, dynamic> feature,
+  ) {
+    final placeName = feature['place_name']?.toString();
+    final center = feature['center'] as List<dynamic>?;
+    if (placeName == null || center == null || center.length != 2) {
+      return null;
+    }
+
+    final lon = (center[0] as num).toDouble();
+    final lat = (center[1] as num).toDouble();
+    return AddressSuggestion(label: placeName, latitude: lat, longitude: lon);
+  }
+
+  // ---------------------------------------------------------------------
+  // Nominatim (respaldo gratis sin configuración)
+  // ---------------------------------------------------------------------
 
   static Uri buildSearchUri(
     String query, {
@@ -40,11 +223,13 @@ class GeocodingService {
       params['viewbox'] = '$minLon,$maxLat,$maxLon,$minLat';
     }
 
-    return Uri.parse('$_baseUrl/search').replace(queryParameters: params);
+    return Uri.parse(
+      '$_nominatimBaseUrl/search',
+    ).replace(queryParameters: params);
   }
 
   static Uri buildReverseGeocodeUri(double latitude, double longitude) {
-    return Uri.parse('$_baseUrl/reverse').replace(
+    return Uri.parse('$_nominatimBaseUrl/reverse').replace(
       queryParameters: {
         'format': 'jsonv2',
         'lat': latitude.toString(),
@@ -54,18 +239,16 @@ class GeocodingService {
     );
   }
 
-  /// Convierte una dirección de texto a coordenadas (Geocodificación Directa).
-  static Future<LocationData?> geocodeAddress(
-    String address, {
+  static Future<List<AddressSuggestion>> _searchNominatim(
+    String query, {
+    required int limit,
     double? nearLatitude,
     double? nearLongitude,
   }) async {
     try {
-      if (address.isEmpty) return null;
-
       final uri = buildSearchUri(
-        address,
-        limit: 3,
+        query,
+        limit: limit,
         nearLatitude: nearLatitude,
         nearLongitude: nearLongitude,
       );
@@ -75,27 +258,20 @@ class GeocodingService {
         headers: {'Accept': 'application/json', 'User-Agent': 'Loginova/1.0'},
       );
 
-      if (response.statusCode != 200) {
-        AppLogger.warn('Geocodificación fallida: ${response.statusCode}');
-        return null;
-      }
+      if (response.statusCode != 200) return [];
 
       final data = jsonDecode(response.body) as List<dynamic>;
-      if (data.isEmpty) {
-        AppLogger.debug('No se encontraron coordenadas para: $address');
-        return null;
-      }
-
-      final first = data.first as Map<String, dynamic>;
-      return parseNominatimLocation(first);
+      return data
+          .map((item) => _nominatimResultToSuggestion(item as Map<String, dynamic>))
+          .whereType<AddressSuggestion>()
+          .toList();
     } catch (e) {
-      AppLogger.warn('Error en geocodificación: $e', error: e);
-      return null;
+      AppLogger.warn('Error en búsqueda de direcciones: $e', error: e);
+      return [];
     }
   }
 
-  /// Convierte coordenadas a dirección legible (Reverse Geocodificación).
-  static Future<String?> reverseGeocode(
+  static Future<String?> _reverseNominatim(
     double latitude,
     double longitude,
   ) async {
@@ -122,44 +298,20 @@ class GeocodingService {
     }
   }
 
-  /// Obtiene múltiples direcciones candidatas para una búsqueda.
-  static Future<List<String>> searchAddresses(
-    String query, {
-    double? nearLatitude,
-    double? nearLongitude,
-  }) async {
-    try {
-      if (query.isEmpty) return [];
+  static AddressSuggestion? _nominatimResultToSuggestion(
+    Map<String, dynamic> result,
+  ) {
+    final location = parseNominatimLocation(result);
+    if (location == null) return null;
 
-      final uri = buildSearchUri(
-        query,
-        limit: 4,
-        nearLatitude: nearLatitude,
-        nearLongitude: nearLongitude,
-      );
+    final label = formatNominatimAddress(result);
+    if (label.isEmpty) return null;
 
-      final response = await http.get(
-        uri,
-        headers: {'Accept': 'application/json', 'User-Agent': 'Loginova/1.0'},
-      );
-
-      if (response.statusCode != 200) return [];
-
-      final data = jsonDecode(response.body) as List<dynamic>;
-      return data
-          .map((item) => formatNominatimAddress(item as Map<String, dynamic>))
-          .where((value) => value.isNotEmpty)
-          .toList();
-    } catch (e) {
-      AppLogger.warn('Error en búsqueda de direcciones: $e', error: e);
-      return [];
-    }
-  }
-
-  /// Valida si una dirección es válida y retorna sus coordenadas.
-  static Future<bool> validateAddress(String address) async {
-    final location = await geocodeAddress(address);
-    return location != null;
+    return AddressSuggestion(
+      label: label,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    );
   }
 
   static String formatNominatimAddress(Map<String, dynamic> result) {

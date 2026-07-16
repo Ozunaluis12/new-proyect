@@ -42,7 +42,7 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
   double? _selectedLongitude;
 
   Timer? _direccionDebounceTimer;
-  List<String> _addressSuggestions = [];
+  List<AddressSuggestion> _addressSuggestions = [];
   bool _isSearchingAddress = false;
   bool _guardando = false;
 
@@ -536,12 +536,17 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
                 final suggestion = _addressSuggestions[index];
                 return ListTile(
                   dense: true,
-                  title: Text(suggestion),
+                  title: Text(suggestion.label),
                   leading: const Icon(Icons.location_on_outlined, size: 18),
                   onTap: () {
-                    _direccionController.text = suggestion;
-                    _addressSuggestions = [];
-                    _buscarDireccionManual();
+                    // La sugerencia ya trae sus coordenadas exactas: no hace
+                    // falta volver a geocodificar el texto seleccionado.
+                    setState(() {
+                      _direccionController.text = suggestion.label;
+                      _selectedLatitude = suggestion.latitude;
+                      _selectedLongitude = suggestion.longitude;
+                      _addressSuggestions = [];
+                    });
                   },
                 );
               },
