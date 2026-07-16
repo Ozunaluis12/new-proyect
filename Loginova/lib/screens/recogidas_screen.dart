@@ -225,7 +225,7 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Cliente ID: ${recogida.clienteId}',
+                          'Cliente: ${(recogida.clienteNombre?.isNotEmpty ?? false) ? recogida.clienteNombre! : '#${recogida.clienteId}'}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],

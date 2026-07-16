@@ -327,10 +327,19 @@ class _MapaScreenState extends State<MapaScreen> {
               ],
 
               // Detalles de la recogida
-              _buildDetailRow('Cliente ID', '#${recogida.clienteId}'),
               _buildDetailRow(
-                'Operador ID',
-                recogida.usuarioId != null ? '#${recogida.usuarioId}' : 'Sin asignar',
+                'Cliente',
+                (recogida.clienteNombre?.isNotEmpty ?? false)
+                    ? recogida.clienteNombre!
+                    : '#${recogida.clienteId}',
+              ),
+              _buildDetailRow(
+                'Operador',
+                recogida.usuarioId == null
+                    ? 'Sin asignar'
+                    : (recogida.usuarioNombre?.isNotEmpty ?? false)
+                    ? recogida.usuarioNombre!
+                    : '#${recogida.usuarioId}',
               ),
               _buildDetailRow(
                 'Cantidad de paquetes',

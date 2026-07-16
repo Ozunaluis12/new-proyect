@@ -45,6 +45,7 @@ public record RecogidaResponse(
     string? ClienteNombre,
     string? ClienteTelefono,
     int? UsuarioId,
+    string? UsuarioNombre,
     string Estado,
     int CantidadPaquetes,
     string? Observaciones,

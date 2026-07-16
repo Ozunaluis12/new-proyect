@@ -159,8 +159,10 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
                   Expanded(
                     child: _buildDetailItem(
                       icon: Icons.person,
-                      label: 'Cliente ID',
-                      value: '#${_recogida.clienteId}',
+                      label: 'Cliente',
+                      value: (_recogida.clienteNombre?.isNotEmpty ?? false)
+                          ? _recogida.clienteNombre!
+                          : '#${_recogida.clienteId}',
                       color: LoginovaColors.info,
                     ),
                   ),
@@ -168,10 +170,12 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
                   Expanded(
                     child: _buildDetailItem(
                       icon: Icons.engineering,
-                      label: 'Operador ID',
-                      value: _recogida.usuarioId != null
-                          ? '#${_recogida.usuarioId}'
-                          : 'Sin asignar',
+                      label: 'Operador',
+                      value: _recogida.usuarioId == null
+                          ? 'Sin asignar'
+                          : (_recogida.usuarioNombre?.isNotEmpty ?? false)
+                          ? _recogida.usuarioNombre!
+                          : '#${_recogida.usuarioId}',
                       color: LoginovaColors.secondary,
                     ),
                   ),

@@ -5,6 +5,7 @@ class Recogida {
   final String? clienteNombre;
   final String? clienteTelefono;
   final int? usuarioId;
+  final String? usuarioNombre;
   final String estado;
   final int cantidadPaquetes;
   final String? observaciones;
@@ -22,6 +23,7 @@ class Recogida {
     this.clienteNombre,
     this.clienteTelefono,
     this.usuarioId,
+    this.usuarioNombre,
     required this.estado,
     required this.cantidadPaquetes,
     this.observaciones,
@@ -41,6 +43,7 @@ class Recogida {
       clienteNombre: json['clienteNombre'],
       clienteTelefono: json['clienteTelefono'],
       usuarioId: json['usuarioId'],
+      usuarioNombre: json['usuarioNombre'],
       estado: json['estado'],
       cantidadPaquetes: json['cantidadPaquetes'],
       observaciones: json['observaciones'],

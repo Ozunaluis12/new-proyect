@@ -66,6 +66,7 @@ public class RecogidasController : ControllerBase
             .AsNoTracking()
             .Include(recogida => recogida.Evidencias)
             .Include(recogida => recogida.Cliente)
+            .Include(recogida => recogida.Usuario)
             .ToListAsync();
 
         return Ok(recogidas.Select(ToResponse).ToList());
@@ -81,6 +82,7 @@ public class RecogidasController : ControllerBase
             .AsNoTracking()
             .Include(item => item.Evidencias)
             .Include(item => item.Cliente)
+            .Include(item => item.Usuario)
             .SingleOrDefaultAsync(item => item.Id == id);
 
         return recogida is null ? NotFound() : Ok(ToResponse(recogida));
@@ -109,7 +111,10 @@ public class RecogidasController : ControllerBase
             return BadRequest(new { mensaje = "Cliente no existe" });
         }
 
-        if (!await _context.Usuarios.AnyAsync(u => u.Id == request.UsuarioId))
+        var usuarioAsignado = request.UsuarioId.HasValue
+            ? await _context.Usuarios.FindAsync(request.UsuarioId.Value)
+            : null;
+        if (usuarioAsignado is null)
         {
             return BadRequest(new { mensaje = "Usuario no existe" });
         }
@@ -119,6 +124,7 @@ public class RecogidasController : ControllerBase
             ClienteId = request.ClienteId,
             Cliente = cliente,
             UsuarioId = request.UsuarioId,
+            Usuario = usuarioAsignado,
             Estado = string.IsNullOrWhiteSpace(request.Estado) ? "Pendiente" : request.Estado,
             CantidadPaquetes = request.CantidadPaquetes,
             Observaciones = request.Observaciones,
@@ -355,17 +361,27 @@ public class RecogidasController : ControllerBase
             UsuarioId = usuarioIdClaim > 0 ? usuarioIdClaim : null,
         });
 
-        if (request.DineroRecibido && usuarioIdClaim > 0)
+        if (request.DineroRecibido)
         {
-            _context.Ingresos.Add(new Ingreso
+            // El dinero se atribuye al operador ASIGNADO a la recogida (quien
+            // físicamente tiene el efectivo/comprobante), no a quien haya
+            // hecho la llamada a la API — de lo contrario, si un admin o
+            // subadministrador marca el pago en nombre de un operador, el
+            // dinero quedaría mal atribuido y la caja de ese operador nunca
+            // lo mostraría como pendiente.
+            var responsableId = recogida.UsuarioId ?? (usuarioIdClaim > 0 ? usuarioIdClaim : (int?)null);
+            if (responsableId.HasValue)
             {
-                RecogidaId = recogida.Id,
-                ClienteId = recogida.ClienteId,
-                ResponsableUsuarioId = usuarioIdClaim,
-                Monto = request.MontoCobrado ?? 0m,
-                FormaPago = request.FormaPago ?? "Efectivo",
-                FechaIngreso = DateTime.UtcNow,
-            });
+                _context.Ingresos.Add(new Ingreso
+                {
+                    RecogidaId = recogida.Id,
+                    ClienteId = recogida.ClienteId,
+                    ResponsableUsuarioId = responsableId.Value,
+                    Monto = request.MontoCobrado ?? 0m,
+                    FormaPago = request.FormaPago ?? "Efectivo",
+                    FechaIngreso = DateTime.UtcNow,
+                });
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -411,6 +427,7 @@ public class RecogidasController : ControllerBase
             .AsNoTracking()
             .Include(item => item.Evidencias)
             .Include(item => item.Cliente)
+            .Include(item => item.Usuario)
             .SingleAsync(item => item.Id == id);
 
         return Ok(ToResponse(actualizada));
@@ -470,6 +487,7 @@ public class RecogidasController : ControllerBase
             recogida.Cliente?.Nombre,
             recogida.Cliente?.Telefono,
             recogida.UsuarioId,
+            recogida.Usuario?.Nombre,
             recogida.Estado,
             recogida.CantidadPaquetes,
             recogida.Observaciones,
