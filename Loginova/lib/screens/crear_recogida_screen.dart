@@ -107,7 +107,7 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
         context,
         listen: false,
       ).currentLocation;
-      final location = await GeocodingService.geocodeAddress(
+      final resultados = await GeocodingService.searchAddresses(
         query,
         nearLatitude: ubicacionActual?.latitude,
         nearLongitude: ubicacionActual?.longitude,
@@ -115,23 +115,17 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
 
       if (!mounted) return;
 
-      if (location != null) {
+      if (resultados.isNotEmpty) {
+        final resultado = resultados.first;
         setState(() {
-          _selectedLatitude = location.latitude;
-          _selectedLongitude = location.longitude;
+          _direccionController.text = resultado.label;
+          _selectedLatitude = resultado.latitude;
+          _selectedLongitude = resultado.longitude;
+          if ((resultado.city ?? '').isNotEmpty) {
+            _ciudadController.text = resultado.city!;
+          }
           _addressSuggestions = [];
         });
-
-        final address = await GeocodingService.reverseGeocode(
-          location.latitude,
-          location.longitude,
-        );
-
-        if (!mounted) return;
-
-        if (address != null && address.isNotEmpty) {
-          _direccionController.text = address;
-        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -545,6 +539,9 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
                       _direccionController.text = suggestion.label;
                       _selectedLatitude = suggestion.latitude;
                       _selectedLongitude = suggestion.longitude;
+                      if ((suggestion.city ?? '').isNotEmpty) {
+                        _ciudadController.text = suggestion.city!;
+                      }
                       _addressSuggestions = [];
                     });
                   },

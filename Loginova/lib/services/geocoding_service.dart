@@ -11,11 +11,13 @@ class AddressSuggestion {
   final String label;
   final double latitude;
   final double longitude;
+  final String? city;
 
   AddressSuggestion({
     required this.label,
     required this.latitude,
     required this.longitude,
+    this.city,
   });
 }
 
@@ -190,7 +192,28 @@ class GeocodingService {
 
     final lon = (center[0] as num).toDouble();
     final lat = (center[1] as num).toDouble();
-    return AddressSuggestion(label: placeName, latitude: lat, longitude: lon);
+    return AddressSuggestion(
+      label: placeName,
+      latitude: lat,
+      longitude: lon,
+      city: _mapboxCiudad(feature),
+    );
+  }
+
+  /// Extrae la ciudad del contexto jerárquico que devuelve Mapbox (el
+  /// elemento cuyo id empieza con "place.", su convención para ciudad).
+  static String? _mapboxCiudad(Map<String, dynamic> feature) {
+    final context = feature['context'] as List<dynamic>?;
+    if (context == null) return null;
+
+    for (final item in context) {
+      final map = item as Map<String, dynamic>;
+      final id = map['id']?.toString() ?? '';
+      if (id.startsWith('place.')) {
+        return map['text_es']?.toString() ?? map['text']?.toString();
+      }
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------------
@@ -307,10 +330,20 @@ class GeocodingService {
     final label = formatNominatimAddress(result);
     if (label.isEmpty) return null;
 
+    String? ciudad;
+    final address = result['address'];
+    if (address is Map<String, dynamic>) {
+      ciudad =
+          address['city']?.toString() ??
+          address['town']?.toString() ??
+          address['municipality']?.toString();
+    }
+
     return AddressSuggestion(
       label: label,
       latitude: location.latitude,
       longitude: location.longitude,
+      city: ciudad,
     );
   }
 
