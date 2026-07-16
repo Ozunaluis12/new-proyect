@@ -19,6 +19,14 @@ public class SmtpEmailSender : IEmailSender
         _logger = logger;
     }
 
+    /// <summary>
+    /// Envía el correo por SMTP. Si faltan credenciales SMTP en la configuración,
+    /// no falla: solo deja constancia en el log y retorna, para que el flujo que
+    /// lo invoca (p. ej. recuperación de contraseña) no se rompa en un entorno de
+    /// desarrollo sin SMTP configurado. En producción (Render) esta implementación
+    /// no se usa porque el proveedor bloquea el puerto SMTP saliente; ver
+    /// <see cref="ResendEmailSender"/>.
+    /// </summary>
     public async Task EnviarAsync(string destinatario, string asunto, string cuerpoTexto)
     {
         var host = _configuration["Smtp:Host"];

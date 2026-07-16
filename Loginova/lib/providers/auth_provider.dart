@@ -25,6 +25,8 @@ class AuthProvider extends ChangeNotifier {
     cargarSesion();
   }
 
+  /// Restaura la sesión guardada al arrancar la app (token + usuario desde
+  /// almacenamiento seguro), evitando pedir login de nuevo en cada apertura.
   Future<void> cargarSesion() async {
     await ApiService.loadToken();
     final usuarioJson = await ApiService.loadUsuarioJson();
@@ -129,6 +131,8 @@ class AuthProvider extends ChangeNotifier {
     return true;
   }
 
+  /// Cierra la sesión: borra el token y los datos del usuario del
+  /// almacenamiento seguro y limpia el estado local.
   Future<void> logout() async {
     await ApiService.clearSession();
     _logueado = false;

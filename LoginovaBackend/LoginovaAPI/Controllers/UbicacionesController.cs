@@ -174,6 +174,9 @@ public class UbicacionesController : ControllerBase
 
     private Task<bool> PuedeGestionarAsync() => TienePermisoAsync(PermisosCatalogo.GestionarUbicaciones);
 
+    // Delega en PermisosService: valida el permiso puntual del usuario sin importar
+    // el nombre de su rol (un Subadministrador puede tener los mismos permisos que
+    // un Operador); Administrador siempre pasa (bypass total).
     private async Task<bool> TienePermisoAsync(string permiso)
     {
         var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;

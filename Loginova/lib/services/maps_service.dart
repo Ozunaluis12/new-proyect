@@ -41,8 +41,14 @@ class LatLng {
   String toString() => '$latitude,$longitude';
 }
 
-/// Servicio para manejo de rutas y optimización usando Google Directions API.
-/// Requiere Google Maps API key con Directions API habilitada.
+/// Servicio para calcular rutas (distancia, tiempo, polyline) y optimizar
+/// paradas. Usado por el botón "Cómo llegar" del mapa.
+///
+/// Usa Google Directions API cuando hay una API key configurada (más
+/// preciso, soporta optimización de waypoints). Si no hay key, la ruta
+/// simple cae a OSRM (router.project-osrm.org), gratis y sin necesidad de
+/// configuración, aunque sin optimización de waypoints ni matriz de
+/// distancias (esas funciones requieren la key de Google).
 class MapsService {
   static const String _directionsUrl =
       'https://maps.googleapis.com/maps/api/directions/json';
@@ -57,7 +63,8 @@ class MapsService {
     _apiKey = apiKey;
   }
 
-  /// Obtiene la ruta entre dos puntos.
+  /// Obtiene la ruta entre dos puntos. Usa Google Directions si hay API key
+  /// configurada; si no, delega en OSRM (ver [_getRouteWithOsrm]).
   static Future<RouteInfo?> getRoute({
     required LatLng origin,
     required LatLng destination,

@@ -7,6 +7,10 @@ import '../services/api_service.dart';
 import '../themes/app_theme.dart';
 import '../widgets/menu_drawer.dart';
 
+/// Pantalla que lista las notificaciones del usuario autenticado (avisos
+/// del sistema, p. ej. recogidas asignadas o cambios de estado), con
+/// búsqueda, filtro de no leídas, paginación local y un botón para probar
+/// el envío de notificaciones.
 class NotificacionesScreen extends StatefulWidget {
   const NotificacionesScreen({super.key});
 
@@ -20,6 +24,8 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
   bool _enviandoPrueba = false;
   bool _soloNoLeidas = false;
   String _busqueda = '';
+  // Cantidad de notificaciones visibles en la lista; crece de 20 en 20 con
+  // "Cargar más" en vez de paginar contra el backend.
   int _visibleCount = 20;
 
   @override
@@ -28,6 +34,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     _cargarNotificaciones();
   }
 
+  /// Trae todas las notificaciones del usuario logueado desde el backend.
   Future<void> _cargarNotificaciones() async {
     setState(() => _cargando = true);
 
@@ -63,6 +70,8 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     }
   }
 
+  /// Marca una notificación como leída en el backend y actualiza el estado
+  /// local sin recargar toda la lista.
   Future<void> _marcarComoLeida(int id) async {
     try {
       final response = await http.put(
@@ -89,6 +98,8 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     }
   }
 
+  /// Pide al backend que envíe una notificación de prueba al usuario actual
+  /// (botón de diagnóstico) y refresca la lista si tuvo éxito.
   Future<void> _enviarPrueba() async {
     if (_enviandoPrueba) return;
 
@@ -116,11 +127,15 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     }
   }
 
+  /// Convierte el valor crudo del JSON (puede llegar como int o String) a
+  /// un entero seguro.
   int _intValue(dynamic value) {
     if (value is int) return value;
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  /// Convierte el valor crudo del JSON (bool, String "true"/"false" o
+  /// número 0/1) a un booleano seguro.
   bool _boolValue(dynamic value) {
     if (value is bool) return value;
     if (value is String) return value.toLowerCase() == 'true';
@@ -128,6 +143,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     return false;
   }
 
+  /// Formatea una fecha ISO del backend a hora local legible dd/mm/yyyy hh:mm.
   String _fechaTexto(dynamic value) {
     if (value == null) return 'Sin fecha';
     final parsed = DateTime.tryParse(value.toString());

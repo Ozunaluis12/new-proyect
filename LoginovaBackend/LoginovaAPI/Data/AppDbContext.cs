@@ -58,6 +58,13 @@ public class AppDbContext : DbContext
     public DbSet<PasswordResetToken> PasswordResetTokens =>
         Set<PasswordResetToken>();
 
+    /// <summary>
+    /// Configura el mapeo de entidades a tablas (nombres en snake_case),
+    /// relaciones/claves foráneas y sus reglas de borrado, índices para las
+    /// consultas más frecuentes, y los datos semilla (roles, catálogo de
+    /// permisos y el usuario Administrador inicial) que EF Core aplica vía
+    /// migraciones con <c>HasData</c>.
+    /// </summary>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -74,6 +81,9 @@ public class AppDbContext : DbContext
             .HasIndex(usuario => usuario.Correo)
             .IsUnique();
 
+        // Roles base del sistema, sembrados con Id fijo para que las migraciones
+        // sean deterministas y los RoleId usados en el resto del código (p. ej.
+        // comparaciones por nombre de rol) siempre existan.
         modelBuilder.Entity<Role>()
             .HasData(
                 new Role { Id = 1, Nombre = "Administrador", Descripcion = "Control total del sistema" },
@@ -81,6 +91,9 @@ public class AppDbContext : DbContext
                 new Role { Id = 3, Nombre = "Cliente", Descripcion = "Consulta servicios" },
                 new Role { Id = 4, Nombre = "Subadministrador", Descripcion = "Gestiona operaciones con permisos limitados" });
 
+        // Siembra en la tabla Permisos el mismo catálogo definido en
+        // PermisosCatalogo, para que la UI de administración pueda listar y
+        // asignar permisos sin tener que duplicar los nombres a mano.
         modelBuilder.Entity<Permiso>()
             .HasData(
                 new Permiso { Id = 1, Nombre = PermisosCatalogo.CrearRecogidas, Descripcion = "Crear nuevas recogidas" },
@@ -155,6 +168,10 @@ public class AppDbContext : DbContext
             .HasForeignKey(recogida => recogida.UsuarioId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Cascade aquí a propósito: un ingreso solo tiene sentido junto a su
+        // recogida, así que si la recogida se borra, sus ingresos se borran con ella
+        // (a diferencia de las relaciones con Usuario/Cliente más abajo, que usan
+        // Restrict para no perder historial al borrar a la persona).
         modelBuilder.Entity<Ingreso>()
             .HasOne(ingreso => ingreso.Recogida)
             .WithMany(recogida => recogida.Ingresos)
@@ -173,6 +190,8 @@ public class AppDbContext : DbContext
             .HasForeignKey(ingreso => ingreso.ResponsableUsuarioId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Igual que con Ingresos: las evidencias (fotos) no tienen sentido sin su
+        // recogida, así que se borran en cascada junto con ella.
         modelBuilder.Entity<Evidencia>()
             .HasOne(evidencia => evidencia.Recogida)
             .WithMany(recogida => recogida.Evidencias)

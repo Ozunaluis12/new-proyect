@@ -17,6 +17,9 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+/// Estado de [HomeScreen]: controla la navegación inferior (bottom nav) y
+/// recarga la lista de recogidas cada vez que se vuelve a la pestaña
+/// Dashboard, para reflejar cambios hechos por otros operadores.
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   final List<Widget> _screens = [

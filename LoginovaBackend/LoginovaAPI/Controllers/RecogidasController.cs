@@ -12,17 +12,24 @@ namespace LoginovaAPI.Controllers;
 [Authorize]
 [Route("api/[controller]")]
 /// <summary>
-/// Controlador para gestionar las recogidas de clientes.
-/// Proporciona operaciones CRUD y mapeo a DTOs de respuesta.
+/// Controlador central del negocio: gestiona las recogidas (pickups) de
+/// paquetes solicitadas por los clientes. Además del CRUD, expone el endpoint
+/// <see cref="UpdateEstado"/> que es el corazón del flujo operativo: ahí un
+/// operador marca una recogida como Recogida o Cancelada, adjunta evidencia
+/// fotográfica y, si hubo cobro, registra el ingreso correspondiente.
 /// </summary>
 public class RecogidasController : ControllerBase
 {
+    // Formas de pago válidas al registrar dinero cobrado en una recogida.
     private static readonly HashSet<string> FormasPagoPermitidas = new(StringComparer.OrdinalIgnoreCase)
     {
         "Efectivo",
         "Transferencia",
     };
 
+    // Estados que un operador puede asignar vía UpdateEstado. No incluye estados
+    // administrativos que pudieran existir a futuro; limita lo que un operador
+    // de campo puede hacer con una recogida.
     private static readonly HashSet<string> EstadosOperadorPermitidos = new(StringComparer.OrdinalIgnoreCase)
     {
         "Pendiente",
@@ -99,6 +106,9 @@ public class RecogidasController : ControllerBase
             return Forbid();
         }
 
+        // Crear recogidas y registrar dinero son permisos independientes: un
+        // usuario puede tener uno sin el otro, así que si el request trae dinero
+        // se exige además el permiso específico de ingresos.
         if ((request.DineroRecibido || request.MontoCobrado.GetValueOrDefault() > 0m) &&
             !await PuedeGestionarAsync(PermisosCatalogo.RegistrarIngresos))
         {
@@ -251,7 +261,11 @@ public class RecogidasController : ControllerBase
     [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
     [RequestSizeLimit(10 * 1024 * 1024)]
     /// <summary>
-    /// Actualiza solo el estado de una recogida y registra evidencia asociada.
+    /// Endpoint principal del flujo operativo: cambia el estado de una recogida
+    /// (Pendiente → Recogida o Cancelada), adjunta la evidencia fotográfica y, si
+    /// hubo cobro, crea el <see cref="Ingreso"/> correspondiente. Tanto la recogida
+    /// como el ingreso quedan atribuidos a quien ejecuta esta llamada (ver más abajo),
+    /// no a quien creó o tenía asignada originalmente la recogida.
     /// </summary>
     public async Task<ActionResult<RecogidaResponse>> UpdateEstado(int id, [FromForm] ActualizarEstadoRecogidaRequest request)
     {
@@ -265,6 +279,9 @@ public class RecogidasController : ControllerBase
             return BadRequest(new { mensaje = "Estado no permitido para el operador" });
         }
 
+        // Igual que en Create: cambiar estado y registrar dinero son permisos
+        // separados, así que un operador podría poder marcar "Recogida" sin poder
+        // cobrar dinero (por ejemplo, si en esa recogida el cobro lo hace otro).
         if ((request.DineroRecibido || request.MontoCobrado.GetValueOrDefault() > 0m) &&
             !await PuedeGestionarAsync(PermisosCatalogo.RegistrarIngresos))
         {
@@ -273,6 +290,8 @@ public class RecogidasController : ControllerBase
 
         if (request.DineroRecibido)
         {
+            // Solo se puede cobrar dinero al completar la recogida (no al
+            // cancelarla ni al dejarla en Pendiente): no tendría sentido de negocio.
             if (!string.Equals(request.Estado, "Recogida", StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest(new { mensaje = "Solo se puede registrar dinero al completar la recogida" });
@@ -329,6 +348,9 @@ public class RecogidasController : ControllerBase
 
         if (string.Equals(request.Estado, "Recogida", StringComparison.OrdinalIgnoreCase))
         {
+            // ??= en vez de asignación directa: si la recogida ya había pasado por
+            // "Recogida" antes (p. ej. se corrigió algo y se reenvía el estado), no
+            // se pisa la fecha original de cuándo se completó realmente.
             recogida.FechaRecogida ??= DateTime.UtcNow;
         }
 
@@ -503,6 +525,8 @@ public class RecogidasController : ControllerBase
             recogida.FechaCreacion);
     }
 
+    // Delega en PermisosService: valida el permiso puntual del usuario sin importar
+    // el nombre de su rol; Administrador siempre pasa (bypass total).
     private async Task<bool> PuedeGestionarAsync(string permiso)
     {
         var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;

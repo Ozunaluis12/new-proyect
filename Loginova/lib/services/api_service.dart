@@ -10,6 +10,12 @@ class ApiService {
     defaultValue: '',
   );
 
+  /// URL base de la API a usar. Si se pasó `--dart-define=API_BASE_URL` se
+  /// respeta eso (útil para apuntar a producción); si no, se elige según la
+  /// plataforma: el emulador de Android no puede usar "localhost" para
+  /// llegar al host (10.0.2.2 es la dirección especial que sí llega), y en
+  /// web/desktop se usa 127.0.0.1 explícito para evitar que "localhost"
+  /// resuelva a IPv6 (::1) cuando el backend solo escucha en IPv4.
   static String get baseUrl {
     if (_apiBaseFromEnv.isNotEmpty) {
       return _apiBaseFromEnv;

@@ -20,6 +20,12 @@ public class ResendEmailSender : IEmailSender
         _logger = logger;
     }
 
+    /// <summary>
+    /// Envía el correo llamando a la API HTTP de Resend (POST /emails). Si Resend
+    /// responde un código de error, se registra el detalle y se lanza una excepción
+    /// para que el llamador (p. ej. el flujo de recuperación de contraseña) sepa
+    /// que el envío falló en vez de asumir éxito silenciosamente.
+    /// </summary>
     public async Task EnviarAsync(string destinatario, string asunto, string cuerpoTexto)
     {
         var apiKey = _configuration["Resend:ApiKey"];

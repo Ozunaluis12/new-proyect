@@ -3,8 +3,11 @@ import 'package:provider/provider.dart';
 import '../providers/location_provider.dart';
 import '../services/maps_service.dart';
 
-/// Widget que muestra información sobre una ruta calculada.
+/// Widget que muestra información sobre una ruta calculada (distancia,
+/// tiempo estimado y resumen), obtenida vía MapsService.
 class RouteInfoCard extends StatelessWidget {
+  // Nula mientras no haya una ruta calculada; en ese caso el widget no
+  // renderiza nada (ver build).
   final RouteInfo? route;
   final VoidCallback? onClose;
 
@@ -72,7 +75,8 @@ class RouteInfoCard extends StatelessWidget {
   }
 }
 
-/// Widget auxiliar para mostrar filas de información.
+/// Widget auxiliar privado para mostrar una fila de icono + etiqueta +
+/// valor (reutilizado por [RouteInfoCard] para distancia, tiempo y ruta).
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -116,7 +120,8 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// Widget que muestra un botón para calcular rutas.
+/// Botón que dispara el cálculo de una ruta (p. ej. hacia la recogida
+/// seleccionada); muestra un spinner mientras [isLoading] es true.
 class RouteCalculatorButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
@@ -152,7 +157,9 @@ class RouteCalculatorButton extends StatelessWidget {
   }
 }
 
-/// Widget que muestra opciones para rastreo de ubicación.
+/// Widget que muestra el estado del rastreo de ubicación en tiempo real
+/// del operador (activo/inactivo, coordenadas actuales, errores) y
+/// permite iniciarlo o detenerlo, usando [LocationProvider].
 class LocationTrackingWidget extends StatefulWidget {
   const LocationTrackingWidget({super.key});
 

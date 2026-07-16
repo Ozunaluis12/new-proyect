@@ -9,6 +9,9 @@ import '../providers/ingresos_provider.dart';
 import '../themes/app_theme.dart';
 import 'cerrar_caja_screen.dart';
 
+/// Total agregado de dinero para un agrupador (cliente, operador, forma de
+/// pago o día), usado solo para alimentar las tarjetas/gráficos de esta
+/// pantalla (no viene tal cual del backend, se calcula en [_agruparTotales]).
 class _ResumenMonto {
   final String nombre;
   final double total;
@@ -16,6 +19,9 @@ class _ResumenMonto {
   const _ResumenMonto({required this.nombre, required this.total});
 }
 
+/// Pestaña de caja/ingresos para administradores: historial de todo el
+/// dinero cobrado por los operadores al completar recogidas (efectivo o
+/// transferencia), con filtros, gráficos y acceso al cierre de caja.
 class IngresosAdminTab extends StatefulWidget {
   const IngresosAdminTab({super.key});
 
@@ -44,6 +50,8 @@ class _IngresosAdminTabState extends State<IngresosAdminTab> {
     super.dispose();
   }
 
+  /// Recarga los ingresos aplicando los filtros actuales de cliente,
+  /// operador responsable y rango de fechas.
   Future<void> _cargar() async {
     await Provider.of<IngresosProvider>(context, listen: false).cargarIngresos(
       cliente: _clienteController.text,
@@ -53,6 +61,8 @@ class _IngresosAdminTabState extends State<IngresosAdminTab> {
     );
   }
 
+  /// Abre el selector de fecha para el filtro "desde" o "hasta" y, al
+  /// elegir una fecha, vuelve a cargar los ingresos con el nuevo rango.
   Future<void> _seleccionarFecha(bool esDesde) async {
     final inicial = esDesde
         ? (_fechaDesde ?? DateTime.now())
@@ -75,6 +85,8 @@ class _IngresosAdminTabState extends State<IngresosAdminTab> {
     await _cargar();
   }
 
+  /// Pide al backend el CSV de ingresos con los filtros actuales, lo guarda
+  /// en un archivo temporal y abre el diálogo nativo de compartir/exportar.
   Future<void> _exportarCsv() async {
     final provider = Provider.of<IngresosProvider>(context, listen: false);
     try {
@@ -103,6 +115,9 @@ class _IngresosAdminTabState extends State<IngresosAdminTab> {
     }
   }
 
+  /// Navega a la pantalla de cierre de caja y, si el cierre se confirma
+  /// (devuelve un resultado no nulo), refresca la lista de ingresos para
+  /// reflejar el nuevo periodo de caja.
   Future<void> _abrirCerrarCaja() async {
     final cierre = await Navigator.push(
       context,
@@ -122,6 +137,11 @@ class _IngresosAdminTabState extends State<IngresosAdminTab> {
     return Consumer<IngresosProvider>(
       builder: (context, provider, _) {
         final ingresos = provider.ingresos;
+        // A partir de la lista de ingresos ya filtrada por el provider se
+        // calculan aquí, en cada rebuild, todos los totales y agrupaciones
+        // (total general, promedio, mayor ingreso, top clientes/operadores,
+        // totales por forma de pago y por día) que alimentan las tarjetas y
+        // gráficos de abajo.
         final total = ingresos.fold<double>(0, (sum, item) => sum + item.monto);
         final promedio = ingresos.isEmpty ? 0.0 : total / ingresos.length;
         final ingresoMayor = ingresos.isEmpty
@@ -849,6 +869,10 @@ class _IngresosAdminTabState extends State<IngresosAdminTab> {
     );
   }
 
+  /// Agrupa una lista de ingresos sumando sus montos según la clave que
+  /// devuelva [selector] (p. ej. cliente, operador, forma de pago o fecha),
+  /// y devuelve el resultado ordenado de mayor a menor total. Es la base de
+  /// todos los "top N" y gráficos de esta pantalla.
   List<_ResumenMonto> _agruparTotales(
     List<Ingreso> ingresos,
     String Function(Ingreso ingreso) selector,
@@ -874,6 +898,8 @@ class _IngresosAdminTabState extends State<IngresosAdminTab> {
     return items;
   }
 
+  /// Formatea una fecha como dd/mm/yyyy; se usa como clave de agrupación
+  /// para el resumen "Ingresos por día".
   String _formatearFecha(DateTime fecha) {
     return '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
   }

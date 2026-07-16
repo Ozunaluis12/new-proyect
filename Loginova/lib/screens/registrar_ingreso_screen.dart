@@ -3,6 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+/// Resultado que [RegistrarIngresoScreen] devuelve por Navigator.pop cuando
+/// el operador confirma el cobro: monto recibido, forma de pago (efectivo o
+/// transferencia) y foto de evidencia opcional. La pantalla que la abre
+/// (cambio de estado de una recogida a "Recogida" con dinero) usa este
+/// borrador para crear el registro de ingreso definitivo.
 class IngresoDraft {
   final double monto;
   final String formaPago;
@@ -11,6 +16,12 @@ class IngresoDraft {
   const IngresoDraft({required this.monto, required this.formaPago, this.foto});
 }
 
+/// Formulario que el operador completa al registrar el dinero cobrado en
+/// una recogida (cantidad, forma de pago y foto de evidencia). No llama a
+/// la API directamente: devuelve un [IngresoDraft] a la pantalla anterior,
+/// que es la que asocia el ingreso a la recogida y al operador que hizo el
+/// cambio de estado (regla de negocio: el dinero se atribuye a quien
+/// completa la recogida, no a quien la creó).
 class RegistrarIngresoScreen extends StatefulWidget {
   const RegistrarIngresoScreen({super.key});
 
@@ -32,6 +43,10 @@ class _RegistrarIngresoScreenState extends State<RegistrarIngresoScreen> {
     super.dispose();
   }
 
+  /// Toma la foto de evidencia del dinero cobrado. Intenta primero con la
+  /// cámara (caso normal en campo) y, si falla (p. ej. sin cámara en un
+  /// emulador/web o permiso denegado), cae a elegir una foto de la galería
+  /// para no bloquear al operador.
   Future<void> _tomarFoto() async {
     final picker = ImagePicker();
 
@@ -66,6 +81,8 @@ class _RegistrarIngresoScreenState extends State<RegistrarIngresoScreen> {
     }
   }
 
+  /// Valida el formulario y devuelve el [IngresoDraft] resultante a quien
+  /// abrió esta pantalla (no persiste nada aquí mismo).
   void _guardar() {
     if (!_formKey.currentState!.validate()) {
       return;

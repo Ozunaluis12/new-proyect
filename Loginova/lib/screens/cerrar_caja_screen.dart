@@ -15,6 +15,9 @@ class CerrarCajaScreen extends StatefulWidget {
   State<CerrarCajaScreen> createState() => _CerrarCajaScreenState();
 }
 
+/// Estado de [CerrarCajaScreen]: maneja la carga de operadores/subadmins
+/// disponibles, el resumen de caja del seleccionado y la confirmación del
+/// cierre.
 class _CerrarCajaScreenState extends State<CerrarCajaScreen> {
   final _observacionesController = TextEditingController();
   final _formatoMoneda = NumberFormat.currency();
@@ -40,6 +43,9 @@ class _CerrarCajaScreenState extends State<CerrarCajaScreen> {
     super.dispose();
   }
 
+  /// Carga la lista de operadores y subadministradores que tienen ingresos
+  /// pendientes de cerrar, y preselecciona automáticamente el primero para
+  /// no dejar la pantalla vacía.
   Future<void> _cargarOperadores() async {
     setState(() {
       _cargandoOperadores = true;
@@ -66,6 +72,8 @@ class _CerrarCajaScreenState extends State<CerrarCajaScreen> {
     }
   }
 
+  /// Pide al backend el resumen de caja pendiente del operador elegido
+  /// (total, desglose efectivo/transferencia y detalle por cliente).
   Future<void> _seleccionarOperador(OperadorDisponible operador) async {
     setState(() {
       _seleccionado = operador;
@@ -91,6 +99,9 @@ class _CerrarCajaScreenState extends State<CerrarCajaScreen> {
     }
   }
 
+  /// Confirma el cierre de caja del operador seleccionado: el backend marca
+  /// como cerrados todos sus ingresos pendientes hasta ese momento. Requiere
+  /// el permiso `cerrarCaja`.
   Future<void> _cerrarCaja() async {
     final operador = _seleccionado;
     if (operador == null) return;

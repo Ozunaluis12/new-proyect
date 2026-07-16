@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace LoginovaAPI.DTOs;
 
+/// <summary>Datos para crear o actualizar una recogida (uso administrativo, no el flujo de cambio de estado del operador).</summary>
 public record RecogidaRequest(
     [Required] int ClienteId,
     int? UsuarioId,
@@ -13,6 +14,12 @@ public record RecogidaRequest(
     bool DineroRecibido,
     decimal? MontoCobrado);
 
+/// <summary>
+/// Datos que envía el operador al procesar una recogida (Pendiente → Recogida o
+/// Cancelada). Este es el flujo que dispara la reasignación de UsuarioId e
+/// Ingreso.ResponsableUsuarioId a quien hace la llamada, y opcionalmente adjunta
+/// evidencia fotográfica y el cobro de dinero.
+/// </summary>
 public class ActualizarEstadoRecogidaRequest
 {
     [Required]
@@ -26,19 +33,24 @@ public class ActualizarEstadoRecogidaRequest
     [Range(0, int.MaxValue)]
     public int? CantidadPaquetes { get; set; }
 
+    /// <summary>URL de una foto de evidencia ya subida (alternativa a enviar el archivo en Foto).</summary>
     public string? FotoUrl { get; set; }
 
     public string? Comentario { get; set; }
 
+    /// <summary>Indica si en este cambio de estado se cobró dinero al cliente.</summary>
     public bool DineroRecibido { get; set; }
 
     public decimal? MontoCobrado { get; set; }
 
+    /// <summary>Forma de pago del cobro: "Efectivo" o "Transferencia".</summary>
     public string? FormaPago { get; set; }
 
+    /// <summary>Archivo de foto de evidencia enviado directamente (multipart/form-data), alternativa a FotoUrl.</summary>
     public IFormFile? Foto { get; set; }
 }
 
+/// <summary>Datos de una recogida devueltos por la API, con los nombres de cliente/usuario ya resueltos en vez de solo IDs.</summary>
 public record RecogidaResponse(
     int Id,
     int ClienteId,

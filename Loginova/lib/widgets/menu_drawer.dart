@@ -5,8 +5,11 @@ import '../constants/permission_constants.dart';
 import '../providers/auth_provider.dart';
 import '../themes/app_theme.dart';
 
-/// Drawer de navegación principal con accesos por rol.
+/// Drawer de navegación principal de la app: muestra opciones distintas
+/// según el rol y los permisos del usuario logueado (por ejemplo, "Panel
+/// Admin" y "Auditoría" solo aparecen para Administrador).
 class MenuDrawer extends StatelessWidget {
+  /// Ruta actual, usada para resaltar el ítem seleccionado en el menú.
   final String currentRoute;
 
   const MenuDrawer({super.key, required this.currentRoute});
@@ -16,6 +19,8 @@ class MenuDrawer extends StatelessWidget {
     final auth = Provider.of<AuthProvider>(context);
     final usuario = auth.usuario;
     final isAdmin = usuario?.rol.toLowerCase() == 'administrador';
+    // El Administrador siempre puede ver cierres; los demás roles
+    // necesitan el permiso explícito verIngresos.
     final puedeVerCierres =
         isAdmin || (usuario?.tienePermiso(PermissionConstants.verIngresos) ?? false);
 
@@ -117,6 +122,9 @@ class MenuDrawer extends StatelessWidget {
     );
   }
 
+  /// Construye un ítem de navegación del drawer. Cierra el drawer al
+  /// tocar y solo navega si la ruta destino es distinta a la actual
+  /// (evita apilar la misma pantalla dos veces).
   Widget _buildTile(
     BuildContext context,
     String route,

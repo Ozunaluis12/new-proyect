@@ -24,6 +24,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    // Carga en paralelo los tres providers que alimentan las pestañas
+    // (Reportes, Ingresos, Usuarios) apenas se construye el primer frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<UsuariosProvider>(context, listen: false).cargarUsuarios();
       Provider.of<RecogidaProvider>(context, listen: false).cargarRecogidas();
@@ -35,7 +37,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     final currentUser = Provider.of<AuthProvider>(context).usuario;
 
-    // Solo Admin puede ver este dashboard
+    // Este panel es exclusivo del rol Administrador (no aplica el sistema
+    // de permisos granulares de PermissionConstants, es un chequeo de rol).
     if (currentUser?.rol.toLowerCase() != 'administrador') {
       return Scaffold(
         appBar: AppBar(title: const Text('Acceso Denegado')),
@@ -96,7 +99,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  /// Tab de Reportes y Estadísticas
+  /// Tab de Reportes y Estadísticas: calcula las métricas (totales por
+  /// estado, ingresos, conteo de usuarios por rol) en el cliente a partir de
+  /// las listas ya cargadas en los providers, sin pedirlas de nuevo al backend.
   Widget _buildReportesTab(BuildContext context) {
     return Consumer2<RecogidaProvider, UsuariosProvider>(
       builder: (context, recogidaProvider, usuariosProvider, _) {

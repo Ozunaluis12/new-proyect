@@ -164,6 +164,11 @@ public class NotificacionService
         return enviadas;
     }
 
+    /// <summary>
+    /// Obtiene los ids de todos los usuarios con rol operativo (Administrador,
+    /// Subadministrador u Operador), opcionalmente excluyendo a uno (típicamente
+    /// quien disparó la acción, para no autonotificarse).
+    /// </summary>
     public async Task<List<int>> ObtenerUsuariosOperativosAsync(int? excluirUsuarioId = null)
     {
         var usuarios = await _context.Usuarios
@@ -182,6 +187,12 @@ public class NotificacionService
         return usuarios;
     }
 
+    /// <summary>
+    /// Obtiene los ids de los usuarios que tienen un permiso específico
+    /// (ver <see cref="PermisosCatalogo"/>), para notificar solo a quienes de
+    /// verdad pueden actuar sobre el evento (p. ej. solo a quienes tienen
+    /// VerIngresos cuando se registra un ingreso nuevo).
+    /// </summary>
     public async Task<List<int>> ObtenerUsuariosConPermisoAsync(string permiso, int? excluirUsuarioId = null)
     {
         // Permisos es una propiedad calculada (deserializa PermisosJson en memoria) y no se
@@ -201,6 +212,11 @@ public class NotificacionService
         return usuarios;
     }
 
+    /// <summary>
+    /// Atajo que combina <see cref="ObtenerUsuariosOperativosAsync"/> con
+    /// <see cref="EnviarNotificacionMasiva"/> para notificar a todo el personal
+    /// operativo en un solo llamado.
+    /// </summary>
     public async Task<int> EnviarNotificacionAUsuariosOperativosAsync(
         string titulo,
         string cuerpo,
@@ -220,6 +236,11 @@ public class NotificacionService
             excluirUsuarioId);
     }
 
+    /// <summary>
+    /// Atajo que combina <see cref="ObtenerUsuariosConPermisoAsync"/> con
+    /// <see cref="EnviarNotificacionMasiva"/> para notificar solo a los usuarios
+    /// que tienen el permiso indicado.
+    /// </summary>
     public async Task<int> EnviarNotificacionAUsuariosConPermisoAsync(
         string permiso,
         string titulo,

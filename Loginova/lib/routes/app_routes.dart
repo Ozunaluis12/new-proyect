@@ -18,8 +18,13 @@ import '../screens/auditoria_screen.dart';
 import '../screens/historial_estados_screen.dart';
 import '../screens/historial_cierres_screen.dart';
 
-/// Definición de todas las rutas nombradas de la aplicación.
+/// Definición de todas las rutas nombradas de la aplicación, incluyendo
+/// los "guards" que restringen el acceso a ciertas pantallas según si
+/// hay sesión iniciada o según el rol del usuario logueado.
 class AppRoutes {
+  /// Envuelve una pantalla para que solo sea accesible con sesión
+  /// iniciada; si no hay sesión, redirige a la pantalla de login en
+  /// lugar de la pantalla protegida.
   static WidgetBuilder _authGuard(WidgetBuilder childBuilder) {
     return (context) {
       final auth = Provider.of<AuthProvider>(context);
@@ -30,6 +35,10 @@ class AppRoutes {
     };
   }
 
+  /// Envuelve una pantalla para que solo sea accesible por el rol
+  /// Administrador; sin sesión redirige a login, y con sesión pero sin
+  /// rol de administrador muestra una pantalla de acceso denegado en
+  /// vez de la pantalla protegida.
   static WidgetBuilder _adminGuard(WidgetBuilder childBuilder) {
     return (context) {
       final auth = Provider.of<AuthProvider>(context);
@@ -51,7 +60,10 @@ class AppRoutes {
     };
   }
 
-  /// Mapa de rutas disponibles en la aplicación.
+  /// Mapa de rutas disponibles en la aplicación. Las rutas de
+  /// autenticación ('/', '/register', '/forgot') quedan abiertas sin
+  /// guard; el resto exige sesión iniciada (_authGuard) y algunas,
+  /// además, rol de Administrador (_adminGuard).
   static Map<String, WidgetBuilder> routes = {
     '/': (context) => const LoginScreen(),
     '/register': (context) => const RegisterScreen(),

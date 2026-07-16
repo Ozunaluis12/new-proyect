@@ -7,7 +7,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LoginovaAPI.Controllers;
 
-/// <summary>Controlador que gestiona el historial de cambios de estado en las recogidas.</summary>
+/// <summary>
+/// Controlador que gestiona el historial de cambios de estado de las recogidas.
+/// En el flujo normal, cada registro lo crea automáticamente
+/// <c>RecogidasController.UpdateEstado</c> al cambiar el estado de una recogida;
+/// los endpoints de escritura de aquí (Create/Update/Delete) están pensados como
+/// corrección administrativa del historial, no como el camino habitual, por eso
+/// están restringidos a Administrador.
+/// </summary>
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]

@@ -51,6 +51,11 @@ class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
     super.dispose();
   }
 
+  /// Guarda los cambios de la recogida. A diferencia del cambio de estado
+  /// desde [CambiarEstadoRecogidaScreen], esta edición NO reasigna el
+  /// usuarioId (operador dueño): se conserva el `widget.recogida.usuarioId`
+  /// original porque aquí solo se corrigen datos, no se ejecuta el flujo
+  /// operativo de "tomar" la recogida.
   Future<void> guardarCambios() async {
     final cantidad = int.tryParse(paquetesController.text.trim());
     if (cantidad == null || cantidad < 0) {

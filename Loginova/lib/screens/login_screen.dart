@@ -12,6 +12,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
+/// Estado de [LoginScreen]: controla el formulario de correo/contraseña y
+/// dispara el login contra [AuthProvider], redirigiendo según el rol.
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _correoController = TextEditingController();
@@ -38,6 +40,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (exito) {
+      // Los administradores van a su propio dashboard (/admin); el resto de
+      // roles (subadmin, operador, cliente) usa el home general.
       final isAdmin = auth.usuario?.rol.toLowerCase() == 'administrador';
       Navigator.pushReplacementNamed(context, isAdmin ? '/admin' : '/home');
       return;

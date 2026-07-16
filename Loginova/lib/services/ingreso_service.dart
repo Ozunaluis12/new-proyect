@@ -7,7 +7,13 @@ import '../models/cierre_caja.dart';
 import '../models/ingreso.dart';
 import 'api_service.dart';
 
+/// Servicio que gestiona la comunicación con el backend para el historial de
+/// dinero cobrado (ingresos) y las operaciones de cierre de caja: listar
+/// operadores disponibles, obtener el resumen pendiente con desglose
+/// efectivo/transferencia, cerrar caja y consultar cierres anteriores.
 class IngresoService {
+  /// Obtiene el historial de ingresos (dinero cobrado), con filtros
+  /// opcionales por cliente, operador y rango de fechas.
   Future<List<Ingreso>> obtenerIngresos({
     String? cliente,
     String? operador,
@@ -43,6 +49,8 @@ class IngresoService {
     return data.map((item) => Ingreso.fromJson(item)).toList();
   }
 
+  /// Exporta los ingresos filtrados a un archivo CSV (bytes) generado por
+  /// el backend, para descarga desde la app.
   Future<Uint8List> exportarIngresosCsv({
     String? cliente,
     String? operador,

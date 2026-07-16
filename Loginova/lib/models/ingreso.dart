@@ -1,3 +1,8 @@
+/// Modelo que representa un ingreso de dinero cobrado en una recogida
+/// (efectivo o transferencia). El [responsableUsuarioId] es el operador
+/// que queda a cargo de ese dinero hasta que se le haga un cierre de
+/// caja; se reasigna al operador que hace el cambio de estado que generó
+/// el cobro, no necesariamente al creador original de la recogida.
 class Ingreso {
   final int id;
   final int recogidaId;
@@ -9,6 +14,7 @@ class Ingreso {
   final String formaPago;
   final DateTime fechaIngreso;
 
+  /// Constructor que requiere todos los campos de un ingreso.
   Ingreso({
     required this.id,
     required this.recogidaId,
@@ -21,6 +27,7 @@ class Ingreso {
     required this.fechaIngreso,
   });
 
+  /// Crea una instancia desde un JSON devuelto por el servidor.
   factory Ingreso.fromJson(Map<String, dynamic> json) {
     return Ingreso(
       id: json['id'],

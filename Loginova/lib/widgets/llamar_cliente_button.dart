@@ -7,6 +7,8 @@ import '../themes/app_theme.dart';
 /// No se muestra si no hay un teléfono registrado.
 class LlamarClienteButton extends StatelessWidget {
   final String? nombreCliente;
+  // Teléfono que ya viene resuelto en el modelo Recogida (clienteTelefono),
+  // no se consulta aparte.
   final String? telefono;
 
   const LlamarClienteButton({
@@ -15,6 +17,10 @@ class LlamarClienteButton extends StatelessWidget {
     required this.telefono,
   });
 
+  /// Abre el marcador telefónico del dispositivo con el número del
+  /// cliente usando el esquema `tel:`. Muestra un aviso si el sistema
+  /// no pudo iniciar la llamada (p. ej. no hay app de teléfono, como
+  /// puede pasar en la versión web).
   Future<void> _llamar(BuildContext context) async {
     final numero = telefono?.trim() ?? '';
     if (numero.isEmpty) return;

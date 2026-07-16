@@ -14,6 +14,9 @@ class AppConstants {
     defaultValue: '',
   );
 
+  // Nota: esta configuración de Google Maps ya no se usa activamente en
+  // la app; el mapa actual se basa en OpenStreetMap/Mapbox. Se conserva
+  // por si se necesita reactivar Directions/Distance Matrix de Google.
   static bool get hasGoogleMapsApiKey => googleMapsApiKey.trim().isNotEmpty;
 
   /// Firebase Project ID (CONFIGURAR AQUÍ)

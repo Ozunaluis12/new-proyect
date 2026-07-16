@@ -12,6 +12,10 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
+/// Estado de [RegisterScreen]: controla el formulario de alta de usuario y
+/// llama a [AuthProvider.register]. El backend crea toda cuenta nueva con
+/// rol Operador por defecto (los demás roles se asignan luego desde
+/// administración).
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();

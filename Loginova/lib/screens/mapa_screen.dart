@@ -25,6 +25,10 @@ class MapaScreen extends StatefulWidget {
   State<MapaScreen> createState() => _MapaScreenState();
 }
 
+/// Estado de [MapaScreen]: mantiene la ubicación GPS del operador, los
+/// marcadores del mapa (operador + recogidas), el estado de la ruta
+/// calculada con "Cómo llegar" y coordina el rastreo de proximidad vía
+/// [ProximityProvider].
 class _MapaScreenState extends State<MapaScreen> {
   final MapController _mapController = MapController();
   final List<Marker> _markers = [];

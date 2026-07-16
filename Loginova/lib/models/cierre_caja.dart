@@ -1,4 +1,6 @@
 /// Operador o subadministrador que puede tener caja pendiente por cerrar.
+/// Se usa para poblar el selector de "a quién cerrarle caja" en la
+/// pantalla de cierre de caja.
 class OperadorDisponible {
   final int id;
   final String nombre;
@@ -6,6 +8,7 @@ class OperadorDisponible {
 
   OperadorDisponible({required this.id, required this.nombre, required this.rol});
 
+  /// Crea una instancia desde un JSON devuelto por el servidor.
   factory OperadorDisponible.fromJson(Map<String, dynamic> json) {
     return OperadorDisponible(
       id: json['id'],
@@ -31,6 +34,7 @@ class IngresoDetalle {
     required this.fechaIngreso,
   });
 
+  /// Crea una instancia desde un JSON devuelto por el servidor.
   factory IngresoDetalle.fromJson(Map<String, dynamic> json) {
     return IngresoDetalle(
       id: json['id'],
@@ -42,7 +46,9 @@ class IngresoDetalle {
   }
 }
 
-/// Dinero pendiente por cerrar de un operador, con desglose y detalle.
+/// Dinero pendiente por cerrar de un operador, con desglose efectivo/
+/// transferencia. Es el "preview" que se muestra antes de generar un
+/// [CierreCaja] manual para ese operador.
 class ResumenCaja {
   final int operadorId;
   final String operadorNombre;
@@ -62,6 +68,7 @@ class ResumenCaja {
     required this.detalle,
   });
 
+  /// Crea una instancia desde un JSON devuelto por el servidor.
   factory ResumenCaja.fromJson(Map<String, dynamic> json) {
     return ResumenCaja(
       operadorId: json['operadorId'],
@@ -77,7 +84,10 @@ class ResumenCaja {
   }
 }
 
-/// Un cierre de caja ya guardado (manual o automático).
+/// Un cierre de caja ya guardado (manual o automático). El campo
+/// [generadoAutomaticamente] distingue si lo generó el cierre diario
+/// automático del sistema o si lo hizo un administrador/subadministrador
+/// manualmente desde la app.
 class CierreCaja {
   final int id;
   final int operadorId;
@@ -107,6 +117,7 @@ class CierreCaja {
     this.detalle,
   });
 
+  /// Crea una instancia desde un JSON devuelto por el servidor.
   factory CierreCaja.fromJson(Map<String, dynamic> json) {
     return CierreCaja(
       id: json['id'],

@@ -22,6 +22,10 @@ class DetalleRecogidaScreen extends StatefulWidget {
   State<DetalleRecogidaScreen> createState() => _DetalleRecogidaScreenState();
 }
 
+/// Estado de [DetalleRecogidaScreen]. Mantiene una copia local mutable de la
+/// recogida (`_recogida`) para reflejar de inmediato en pantalla los cambios
+/// que vienen de vuelta de las pantallas de editar / cambiar estado /
+/// agregar evidencia, sin depender de que el provider recargue la lista.
 class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
   late Recogida _recogida;
   late List<String> _evidencias;
@@ -33,6 +37,8 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
     _evidencias = List<String>.from(_recogida.evidencias);
   }
 
+  /// Abre la edición de datos generales de la recogida y, si vuelve con una
+  /// versión actualizada, refresca el estado local de esta pantalla.
   Future<void> _editarRecogida() async {
     final actualizada = await Navigator.push<Recogida>(
       context,
@@ -53,6 +59,9 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
     }
   }
 
+  /// Abre la captura de una foto de evidencia suelta (fuera del flujo de
+  /// cambio de estado) y, de subirse, la agrega a la lista local de
+  /// evidencias mostradas en la grilla.
   Future<void> _agregarEvidencia() async {
     final evidenciaPath = await Navigator.push<String>(
       context,
@@ -72,6 +81,8 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
     }
   }
 
+  /// Abre [CambiarEstadoRecogidaScreen] (donde ocurre la reasignación de
+  /// dueño y responsable del dinero) y sincroniza el resultado en pantalla.
   Future<void> _cambiarEstado() async {
     final actualizada = await Navigator.push<Recogida>(
       context,
@@ -585,7 +596,10 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
     );
   }
 
-  /// Construye los botones de acción
+  /// Construye los botones de acción. Quien tiene permiso de editar
+  /// recogidas ve las acciones de edición completa; si no, pero tiene
+  /// permiso de cambiar estado y/o subir evidencias (caso típico del
+  /// operador en campo), ve solo esas acciones acotadas.
   Widget _buildActionButtons() {
     final usuario = Provider.of<AuthProvider>(context).usuario;
     final puedeEditar =

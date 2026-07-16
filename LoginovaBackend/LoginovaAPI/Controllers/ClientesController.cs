@@ -134,6 +134,12 @@ public class ClientesController : ControllerBase
 
     private Task<bool> PuedeGestionarAsync() => TienePermisoAsync(PermisosCatalogo.GestionarClientes);
 
+    /// <summary>
+    /// Extrae el usuario del token y delega en PermisosService, que valida el
+    /// permiso puntual (VerClientes/GestionarClientes) contra los permisos
+    /// asignados a ese usuario, sin importar el nombre de su rol. Si el usuario
+    /// es Administrador, PermisosService siempre devuelve true (bypass total).
+    /// </summary>
     private async Task<bool> TienePermisoAsync(string permiso)
     {
         var usuarioIdClaim = int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0;

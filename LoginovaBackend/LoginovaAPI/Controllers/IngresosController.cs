@@ -8,6 +8,13 @@ using System.Text;
 
 namespace LoginovaAPI.Controllers;
 
+/// <summary>
+/// Controlador de ingresos (dinero cobrado en recogidas) y cierre de caja.
+/// Un ingreso se crea automáticamente en <see cref="RecogidasController.UpdateEstado"/>
+/// cuando se completa una recogida con cobro; este controlador expone su consulta,
+/// exportación y el flujo de cierre de caja (manual y automático nocturno) que
+/// agrupa los ingresos aún no cerrados de un operador en un <c>CierreCaja</c>.
+/// </summary>
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
@@ -56,6 +63,10 @@ public class IngresosController : ControllerBase
         return await Task.FromResult(int.TryParse(User.FindFirst("userId")?.Value, out var uid) ? uid : 0);
     }
 
+    /// <summary>
+    /// Lista los ingresos registrados, con filtros opcionales por cliente, operador
+    /// responsable y rango de fechas (interpretado en la zona horaria del negocio).
+    /// </summary>
     [HttpGet]
     public async Task<ActionResult<List<IngresoResponse>>> GetAll(
         [FromQuery] string? cliente,
@@ -117,6 +128,10 @@ public class IngresosController : ControllerBase
         return Ok(ingresos);
     }
 
+    /// <summary>
+    /// Exporta a CSV los mismos ingresos que <see cref="GetAll"/>, con los mismos
+    /// filtros, para que el administrador pueda auditar la caja fuera del sistema.
+    /// </summary>
     [HttpGet("export")]
     public async Task<IActionResult> ExportCsv(
         [FromQuery] string? cliente,
@@ -174,7 +189,9 @@ public class IngresosController : ControllerBase
             string formaPago = item.FormaPago ?? string.Empty;
             string fecha = item.FechaIngreso.ToString("o");
 
-            // Escape double quotes and wrap fields containing commas in quotes
+            // Escapa comillas dobles y envuelve entre comillas los campos que
+            // contengan comas o saltos de línea, para que el CSV no se desalinee
+            // (p. ej. nombres de cliente u operador con comas).
             string Escape(string s)
             {
                 if (s.Contains(",") || s.Contains("\"") || s.Contains("\n") || s.Contains("\r"))
@@ -337,6 +354,8 @@ public class IngresosController : ControllerBase
         var cierres = new List<CierreCajaResponse>();
         foreach (var operadorId in operadoresConPendientes)
         {
+            // creadoPor: 0 es el valor centinela para "sin usuario" (no hay un
+            // admin logueado disparando esto, es el cron).
             var cierre = await CerrarCajaOperadorAsync(
                 operadorId,
                 creadoPor: 0,
@@ -381,6 +400,10 @@ public class IngresosController : ControllerBase
             query = query.Where(c => c.OperadorId == operadorId.Value);
         }
 
+        // A diferencia de los filtros de ingresos (que usan RangoDiaEnUtc para
+        // acotar por rango UTC), aquí se compara directo contra Fecha porque ese
+        // campo ya guarda la fecha de calendario "de negocio" del cierre (ver
+        // HoyNegocio), no un timestamp con hora.
         if (fechaDesde.HasValue)
         {
             query = query.Where(c => c.Fecha >= fechaDesde.Value.Date);

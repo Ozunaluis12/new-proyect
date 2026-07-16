@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../themes/app_theme.dart';
 import '../widgets/menu_drawer.dart';
 
+/// Pantalla informativa estática ("Acerca de Loginova"): muestra versión,
+/// stack tecnológico, aviso de privacidad y contacto de soporte. No tiene
+/// lógica de negocio ni llamadas al backend.
 class AcercaScreen extends StatelessWidget {
   const AcercaScreen({super.key});
 

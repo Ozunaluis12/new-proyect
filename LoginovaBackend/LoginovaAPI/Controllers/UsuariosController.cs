@@ -8,6 +8,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LoginovaAPI.Controllers;
 
+/// <summary>
+/// Controlador de administración de usuarios (Operadores y Subadministradores).
+/// Todo el controlador está restringido a rol Administrador: la gestión de cuentas,
+/// roles y permisos granulares (ver <see cref="PermisosCatalogo"/>) es una operación
+/// sensible que no se delega ni siquiera a Subadministradores. Cada creación,
+/// modificación o baja de usuario queda registrada en auditoría.
+/// </summary>
 [ApiController]
 [Authorize(Roles = "Administrador")]
 [Route("api/[controller]")]
@@ -24,6 +31,7 @@ public class UsuariosController : ControllerBase
         _auditoria = auditoria;
     }
 
+    /// <summary>Obtiene todos los usuarios del sistema junto con su rol y permisos asignados.</summary>
     [HttpGet]
     public async Task<ActionResult<List<UsuarioResponse>>> GetAll()
     {
@@ -41,6 +49,12 @@ public class UsuariosController : ControllerBase
         return Ok(usuarios);
     }
 
+    /// <summary>
+    /// Crea un usuario con rol Operador o Subadministrador y le asigna un conjunto de
+    /// permisos granulares. El rol Administrador nunca se crea desde aquí (solo existe
+    /// por seed/migración), porque ese rol tiene bypass total de permisos y no debe
+    /// otorgarse por accidente desde el panel.
+    /// </summary>
     [HttpPost]
     [Authorize(Roles = "Administrador")]
     public async Task<ActionResult<UsuarioResponse>> Create(UsuarioCreateRequest request)
@@ -50,6 +64,10 @@ public class UsuariosController : ControllerBase
             return Conflict(new { mensaje = "El correo ya esta registrado" });
         }
 
+        // Solo se permite crear Operador o Subadministrador desde el panel; el rol
+        // determina el nombre visible, pero los permisos reales los define el arreglo
+        // "Permisos" de abajo (un Subadministrador puede terminar con los mismos
+        // permisos que un Operador, o viceversa, según lo configure el admin).
         if (!PermisosCatalogo.RolesGestion.Contains(request.Rol))
         {
             return BadRequest(new { mensaje = "Solo se pueden crear Operador o Subadministrador desde el panel" });
@@ -96,6 +114,11 @@ public class UsuariosController : ControllerBase
         return CreatedAtAction(nameof(GetAll), ToResponse(usuario));
     }
 
+    /// <summary>
+    /// Actualiza nombre, correo, rol y permisos de un usuario existente. La contraseña
+    /// solo se cambia si viene explícita en el request; en caso contrario se conserva
+    /// el hash actual (evita forzar un reseteo de contraseña en cada edición de perfil).
+    /// </summary>
     [HttpPut("{id:int}")]
     [Authorize(Roles = "Administrador")]
     public async Task<IActionResult> Update(int id, UsuarioUpdateRequest request)
@@ -158,6 +181,7 @@ public class UsuariosController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Elimina definitivamente un usuario del sistema.</summary>
     [HttpDelete("{id:int}")]
     [Authorize(Roles = "Administrador")]
     public async Task<IActionResult> Delete(int id)

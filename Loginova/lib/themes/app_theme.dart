@@ -27,9 +27,12 @@ class LoginovaColors {
   static const Color textHint = Color(0xFFBDBDBD);
 }
 
-/// Tema de la aplicación Loginova
+/// Tema de la aplicación Loginova: centraliza el ThemeData de Material 3
+/// para que todas las pantallas (Android y web) usen los mismos colores,
+/// tipografías y estilos de componentes.
 class AppTheme {
-  /// Tema claro
+  /// Construye el tema claro de la app (actualmente el único tema
+  /// disponible; no hay modo oscuro implementado).
   static ThemeData lightTheme() {
     return ThemeData(
       useMaterial3: true,

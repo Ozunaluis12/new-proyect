@@ -5,6 +5,10 @@ import '../constants/permission_constants.dart';
 import '../models/usuario.dart';
 import '../providers/usuarios_provider.dart';
 
+/// Formulario para crear un usuario nuevo (Operador o Subadministrador) o
+/// editar uno existente, incluyendo la asignación de sus permisos
+/// granulares (ver [PermissionConstants]) independientes del rol. Se abre
+/// desde el panel de administrador ([AdminDashboardScreen]).
 class CrearEditarUsuarioScreen extends StatefulWidget {
   final Usuario? usuario;
 
@@ -29,6 +33,8 @@ class _CrearEditarUsuarioScreenState extends State<CrearEditarUsuarioScreen> {
   @override
   void initState() {
     super.initState();
+    // Si se pasó un usuario existente, precarga el formulario con sus datos
+    // (menos la contraseña, que se deja vacía y es opcional al editar).
     final usuario = widget.usuario;
     if (usuario != null) {
       _nombreController.text = usuario.nombre;
@@ -48,6 +54,9 @@ class _CrearEditarUsuarioScreenState extends State<CrearEditarUsuarioScreen> {
     super.dispose();
   }
 
+  /// Valida el formulario y crea o actualiza el usuario según corresponda.
+  /// La contraseña solo es obligatoria al crear; al editar, si se deja
+  /// vacía, se envía como `null` para no cambiarla en el backend.
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) {
       return;

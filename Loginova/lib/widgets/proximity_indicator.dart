@@ -6,6 +6,8 @@ import '../themes/app_theme.dart';
 /// Incluye distancia, estado y ETA.
 class ProximityIndicator extends StatelessWidget {
   final ProximityInfo proximityInfo;
+  // Si es true, se muestra la variante pequeña (chip); si no, la tarjeta
+  // expandida con distancia, ETA y aviso.
   final bool isCompact;
 
   const ProximityIndicator({
@@ -14,6 +16,8 @@ class ProximityIndicator extends StatelessWidget {
     this.isCompact = false,
   });
 
+  /// Color asociado al estado de proximidad actual (verde = muy cerca,
+  /// rojo = muy lejos, etc.), reutilizado en ambas variantes del widget.
   Color _getColorForStatus() {
     switch (proximityInfo.status) {
       case ProximityStatus.veryNear:
@@ -29,6 +33,7 @@ class ProximityIndicator extends StatelessWidget {
     }
   }
 
+  /// Ícono asociado al estado de proximidad actual.
   IconData _getIconForStatus() {
     switch (proximityInfo.status) {
       case ProximityStatus.veryNear:
@@ -52,6 +57,8 @@ class ProximityIndicator extends StatelessWidget {
     return _buildExpandedView(context);
   }
 
+  /// Variante compacta: un chip con ícono y distancia, para usar en
+  /// espacios reducidos como encabezados o listas.
   Widget _buildCompactView() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -78,6 +85,8 @@ class ProximityIndicator extends StatelessWidget {
     );
   }
 
+  /// Variante expandida: tarjeta con distancia, ETA estimado y un aviso
+  /// visual cuando el operador todavía está lejos de la recogida.
   Widget _buildExpandedView(BuildContext context) {
     final eta = ProximityService.getETA(proximityInfo.distanceMeters);
 
@@ -175,6 +184,8 @@ class ProximityIndicator extends StatelessWidget {
     );
   }
 
+  /// Columna reutilizable con una etiqueta (p. ej. "Distancia" o "ETA")
+  /// y su valor destacado, usada en la vista expandida.
   Widget _buildInfoColumn({
     required String label,
     required String value,
@@ -202,9 +213,13 @@ class ProximityIndicator extends StatelessWidget {
   }
 }
 
-/// Widget que muestra solo la distancia en tiempo real.
+/// Widget que muestra solo la distancia en tiempo real, con su propio
+/// color según qué tan cerca está el operador (versión más simple que
+/// [ProximityIndicator], sin depender de un [ProximityInfo] completo).
 class DistanceDisplay extends StatelessWidget {
   final double distanceMeters;
+  // Si es false, solo se muestra el valor de distancia sin la etiqueta
+  // de arriba (útil para overlays pequeños en el mapa).
   final bool showLabel;
 
   const DistanceDisplay({
@@ -242,6 +257,9 @@ class DistanceDisplay extends StatelessWidget {
     );
   }
 
+  /// Clasifica la distancia en umbrales fijos (metros) para determinar
+  /// el estado de proximidad, en lugar de reusar el status ya calculado
+  /// en [ProximityInfo] (este widget puede recibir solo la distancia).
   ProximityStatus _getStatusForDistance() {
     if (distanceMeters < 500) {
       return ProximityStatus.veryNear;
@@ -270,7 +288,9 @@ class DistanceDisplay extends StatelessWidget {
   }
 }
 
-/// Widget que muestra un badge indicador de proximidad.
+/// Widget que muestra un badge (chip con tooltip) indicador de
+/// proximidad, pensado para usarse superpuesto sobre el mapa o en
+/// tarjetas de recogida dentro de una lista.
 class ProximityBadge extends StatelessWidget {
   final ProximityInfo proximityInfo;
 

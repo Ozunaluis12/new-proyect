@@ -23,6 +23,9 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AuditoriaActionFilter>();
 builder.Services.AddControllers(options =>
 {
+    // Registra el filtro de auditoría globalmente: todos los controllers quedan
+    // auditados por defecto sin tener que decorarlos uno por uno. El filtro
+    // redacta campos sensibles (password, token) antes de persistir el log.
     options.Filters.AddService<AuditoriaActionFilter>();
 });
 
@@ -86,6 +89,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("LoginovaCors", policy =>
     {
+        // En desarrollo se permite cualquier origen para no fricción al probar
+        // localmente contra distintos puertos/dispositivos; en producción se
+        // restringe a la lista explícita (frontend Flutter web en Netlify) para
+        // que no cualquier sitio pueda llamar a la API con las credenciales del usuario.
         if (builder.Environment.IsDevelopment())
         {
             policy.AllowAnyOrigin()

@@ -26,6 +26,8 @@ class _HistorialCierresScreenState extends State<HistorialCierresScreen> {
     _cargar();
   }
 
+  /// Carga la lista completa de cierres de caja (manuales y los generados
+  /// automáticamente por el backend a las 11:59pm hora Colombia).
   Future<void> _cargar() async {
     setState(() {
       _cargando = true;
@@ -49,6 +51,9 @@ class _HistorialCierresScreenState extends State<HistorialCierresScreen> {
     }
   }
 
+  /// Pide al backend el detalle completo de un cierre puntual (incluye el
+  /// desglose por cliente/forma de pago, que no viene en el listado) y lo
+  /// muestra en una hoja inferior.
   Future<void> _abrirDetalle(CierreCaja cierre) async {
     final provider = Provider.of<IngresosProvider>(context, listen: false);
     try {
@@ -142,6 +147,9 @@ class _NumberFormatSimple {
   }
 }
 
+/// Hoja inferior (bottom sheet) con el detalle de un cierre de caja puntual:
+/// totales desglosados por efectivo/transferencia y el listado de
+/// movimientos que lo componen.
 class _DetalleCierreSheet extends StatelessWidget {
   final CierreCaja cierre;
 

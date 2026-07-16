@@ -37,6 +37,11 @@ class Usuario {
     };
   }
 
+  /// Chequeo de permisos del lado del cliente: solo sirve para
+  /// mostrar/ocultar elementos de la UI. La autorización real de cada
+  /// acción siempre la valida el backend, así que esto nunca debe usarse
+  /// como único mecanismo de seguridad.
+  /// El Administrador siempre tiene todos los permisos implícitamente.
   bool tienePermiso(String permiso) {
     if (rol.toLowerCase() == 'administrador') {
       return true;

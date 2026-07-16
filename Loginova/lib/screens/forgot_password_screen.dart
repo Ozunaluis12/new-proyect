@@ -38,6 +38,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
+  /// Paso 1 del flujo: pide al backend que envíe un código de 6 dígitos al
+  /// correo ingresado. Si tiene éxito, avanza al paso 2. El mensaje de éxito
+  /// es intencionalmente genérico ("si el correo está registrado...") para
+  /// no revelar si ese correo existe o no en el sistema.
   Future<void> _solicitarCodigo() async {
     if (!_formKeyCorreo.currentState!.validate()) return;
 
@@ -69,6 +73,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
+  /// Paso 2 del flujo: valida que las dos contraseñas coincidan y envía el
+  /// código de 6 dígitos junto con la nueva contraseña al backend, que
+  /// verifica el código antes de aplicar el cambio.
   Future<void> _restablecer() async {
     if (!_formKeyCodigo.currentState!.validate()) return;
 

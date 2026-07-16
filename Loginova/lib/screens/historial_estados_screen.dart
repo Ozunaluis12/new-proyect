@@ -7,6 +7,11 @@ import '../services/api_service.dart';
 import '../themes/app_theme.dart';
 import '../widgets/menu_drawer.dart';
 
+/// Pantalla que lista el historial de cambios de estado de las recogidas
+/// (auditoría de quién movió cada recogida entre Pendiente/Recogida/Cancelada
+/// y cuándo). Si [recogidaId] viene informado muestra solo el historial de
+/// esa recogida (usada embebida en el detalle); si es null, muestra el
+/// historial global desde el menú.
 class HistorialEstadosScreen extends StatefulWidget {
   final int? recogidaId;
 
@@ -26,6 +31,9 @@ class _HistorialEstadosScreenState extends State<HistorialEstadosScreen> {
     _cargarHistorial();
   }
 
+  /// Trae del backend el historial de estados: global (`/historialestados`)
+  /// o filtrado por una recogida específica si [HistorialEstadosScreen.recogidaId]
+  /// no es nulo.
   Future<void> _cargarHistorial() async {
     setState(() => _cargando = true);
 
@@ -71,6 +79,8 @@ class _HistorialEstadosScreenState extends State<HistorialEstadosScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Formatea una fecha ISO (tal como llega del backend en UTC) a hora local
+  /// legible dd/mm/yyyy hh:mm.
   String _fecha(dynamic value) {
     final parsed = DateTime.tryParse(value?.toString() ?? '');
     if (parsed == null) return 'Sin fecha';

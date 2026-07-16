@@ -20,6 +20,9 @@ class RecogidasScreen extends StatefulWidget {
   State<RecogidasScreen> createState() => _RecogidasScreenState();
 }
 
+/// Estado de [RecogidasScreen]: mantiene el filtro de estado seleccionado y
+/// coordina la navegación hacia el detalle, edición y cambio de estado de
+/// cada recogida, recargando la lista al volver de esas pantallas.
 class _RecogidasScreenState extends State<RecogidasScreen> {
   String _filtroEstado = 'Todos';
   final List<String> _estados = [
@@ -39,6 +42,8 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
     });
   }
 
+  /// Abre el detalle de una recogida y, al volver, recarga la lista por si
+  /// el detalle cambió su estado, dinero cobrado u operador responsable.
   Future<void> _abrirDetalle(Recogida recogida) async {
     await Navigator.push(
       context,

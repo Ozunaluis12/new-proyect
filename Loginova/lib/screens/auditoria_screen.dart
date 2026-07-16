@@ -9,6 +9,10 @@ import '../services/api_service.dart';
 import '../themes/app_theme.dart';
 import '../widgets/menu_drawer.dart';
 
+/// Pantalla de auditoría (solo Administrador): lista el historial de
+/// operaciones CREATE/UPDATE/DELETE registradas por el backend sobre las
+/// entidades del sistema (recogidas, usuarios, etc.), con filtro por acción
+/// y búsqueda de texto.
 class AuditoriaScreen extends StatefulWidget {
   const AuditoriaScreen({super.key});
 
@@ -29,6 +33,9 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
     _cargarAuditoria();
   }
 
+  /// Pide el log de auditoría completo al backend. El endpoint solo lo
+  /// puede leer un administrador, por eso se maneja explícitamente el 403
+  /// (usuario autenticado pero sin rol suficiente) distinto de otros errores.
   Future<void> _cargarAuditoria() async {
     setState(() => _cargando = true);
 
@@ -73,6 +80,9 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
     ).showSnackBar(SnackBar(content: Text(mensaje)));
   }
 
+  /// Aplica el filtro de acción (TODAS/CREATE/UPDATE/DELETE) y la búsqueda
+  /// de texto sobre los logs ya cargados en memoria (sin volver a llamar al
+  /// backend), para que la UI responda al instante.
   List<Map<String, dynamic>> get _logsFiltrados {
     final filteredByAction = _filtroAccion == 'TODAS'
         ? _logs
@@ -121,6 +131,8 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Paginación simple en cliente: solo se muestran _visibleCount registros
+    // y el botón "Cargar más" amplía ese límite de a 20.
     final logsVisibles = _logsFiltrados.take(_visibleCount).toList();
     final puedeCargarMas = _logsFiltrados.length > _visibleCount;
 

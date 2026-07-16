@@ -12,6 +12,9 @@ class AuthResult {
   AuthResult({required this.token, required this.usuario});
 }
 
+/// Servicio que gestiona las peticiones de autenticación al backend: login,
+/// registro y el flujo de dos pasos de recuperación de contraseña (solicitar
+/// código por correo y luego resetear con ese código).
 class AuthService {
   /// Envía la solicitud de inicio de sesión al backend y guarda la sesión si es exitosa.
   Future<AuthResult?> login(String correo, String password) async {

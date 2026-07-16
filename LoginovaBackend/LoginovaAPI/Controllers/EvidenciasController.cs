@@ -8,7 +8,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LoginovaAPI.Controllers;
 
-/// <summary>Controlador que gestiona las operaciones de evidencias (fotos) en el sistema.</summary>
+/// <summary>
+/// Controlador que gestiona las evidencias (fotos) de las recogidas. El archivo en
+/// sí lo guarda y sirve <see cref="EvidenciaStorageService"/> (fuera de wwwroot,
+/// nunca como estático público); aquí solo se administra el registro en base de
+/// datos (Evidencia) y la URL resultante. La creación normal de evidencia ocurre
+/// como parte de <c>RecogidasController.UpdateEstado</c>; el POST de este
+/// controlador es un camino alterno para subir evidencia fuera de ese flujo.
+/// </summary>
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
@@ -126,7 +133,11 @@ public class EvidenciasController : ControllerBase
         evidencia.Comentario,
         evidencia.FechaCreacion);
 
-    /// <summary>Elimina una evidencia por su identificador.</summary>
+    /// <summary>
+    /// Elimina una evidencia por su identificador. Restringido a Administrador:
+    /// una evidencia es el respaldo de que una recogida se completó (o de un cobro),
+    /// así que un operador no puede borrar su propia prueba.
+    /// </summary>
     [HttpDelete("{id:int}")]
     [Authorize(Roles = "Administrador")]
     public async Task<IActionResult> Delete(int id)

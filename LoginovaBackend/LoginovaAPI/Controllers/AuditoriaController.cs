@@ -6,6 +6,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LoginovaAPI.Controllers;
 
+/// <summary>
+/// Controlador de solo lectura para consultar el registro de auditoría (quién
+/// cambió qué, cuándo y desde qué IP). Los logs los genera automáticamente
+/// <c>AuditoriaActionFilter</c> en cada creación/edición/borrado relevante (con
+/// campos sensibles como password o token ya redactados antes de guardarse), por
+/// lo que aquí no hay endpoints de escritura. Restringido a Administrador porque
+/// expone actividad de todos los usuarios del sistema.
+/// </summary>
 [ApiController]
 [Authorize(Roles = "Administrador")]
 [Route("api/[controller]")]

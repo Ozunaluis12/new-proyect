@@ -5,6 +5,11 @@ import '../providers/auth_provider.dart';
 import '../themes/app_theme.dart';
 import '../widgets/menu_drawer.dart';
 
+/// Pantalla donde un usuario YA autenticado cambia su propia contraseña.
+/// Reutiliza el mismo flujo de dos pasos (código por correo + nueva
+/// contraseña) que [ForgotPasswordScreen], porque el backend no expone un
+/// endpoint de "cambiar contraseña sabiendo la actual": aquí también se pide
+/// verificar por código en vez de pedir la contraseña vieja.
 class SeguridadScreen extends StatefulWidget {
   const SeguridadScreen({super.key});
 
@@ -22,6 +27,9 @@ class _SeguridadScreenState extends State<SeguridadScreen> {
   bool _mostrarConfirm = false;
   bool _codigoEnviado = false;
 
+  /// Precarga el correo del usuario logueado en el campo de correo (una
+  /// sola vez) para que no tenga que volver a escribirlo, ya que el cambio
+  /// de contraseña siempre es sobre la cuenta propia.
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -45,6 +53,9 @@ class _SeguridadScreenState extends State<SeguridadScreen> {
     super.dispose();
   }
 
+  /// Solicita al backend el envío del código de verificación por correo
+  /// (paso 1 del flujo de recuperación, reutilizado aquí como confirmación
+  /// de identidad para el cambio de contraseña).
   Future<void> _enviarCodigo() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final ok = await auth.solicitarCodigoRecuperacion(
@@ -72,6 +83,9 @@ class _SeguridadScreenState extends State<SeguridadScreen> {
     );
   }
 
+  /// Valida el código recibido por correo y la nueva contraseña, y llama a
+  /// [AuthProvider.resetPassword] (mismo endpoint que "olvidé mi
+  /// contraseña") para completar el cambio.
   Future<void> _actualizarPassword() async {
     if (!_formKey.currentState!.validate()) return;
 

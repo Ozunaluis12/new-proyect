@@ -6,6 +6,14 @@ using Microsoft.AspNetCore.Http;
 
 namespace LoginovaAPI.Services;
 
+/// <summary>
+/// Filtro de acción global que audita automáticamente cada request que modifica
+/// datos (POST/PUT/PATCH/DELETE, nunca GET/HEAD). Captura quién hizo el cambio,
+/// sobre qué entidad y con qué valores, y antes de guardar el log REDACTA los
+/// campos sensibles (contraseñas, tokens) para que nunca queden en texto plano
+/// en la auditoría. Se registra como filtro global en Program.cs, así que corre
+/// en todos los controllers sin que cada uno tenga que invocarlo explícitamente.
+/// </summary>
 public class AuditoriaActionFilter : IAsyncActionFilter
 {
     // Nombres de propiedad (o fragmentos) que nunca deben quedar en texto plano en el log de auditoría.
@@ -26,6 +34,14 @@ public class AuditoriaActionFilter : IAsyncActionFilter
         _httpContextAccessor = httpContextAccessor;
     }
 
+    /// <summary>
+    /// Se ejecuta alrededor de cada acción del controller. Antes de continuar
+    /// con <paramref name="next"/>, identifica al usuario y la entidad afectada
+    /// y serializa los argumentos de la acción (ya redactados) como "valores
+    /// nuevos"; después de ejecutar la acción, persiste el registro de auditoría.
+    /// Cualquier fallo al auditar se traga silenciosamente para no romper la
+    /// respuesta real de la API por un problema del log.
+    /// </summary>
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         var http = _httpContextAccessor.HttpContext;
@@ -45,7 +61,10 @@ public class AuditoriaActionFilter : IAsyncActionFilter
         var entidadTipo = context.ActionDescriptor.RouteValues.TryGetValue("controller", out var c) ? c ?? "" : "";
         int entidadId = 0;
 
-        // Try to find an id in action arguments
+        // Busca heurísticamente un id de entidad entre los argumentos de la acción:
+        // primero un parámetro literal "id", si no hay, cualquiera que termine en "Id"
+        // (p. ej. "recogidaId"). No requiere que cada acción declare explícitamente
+        // cuál es su entidad.
         if (context.ActionArguments != null && context.ActionArguments.Count > 0)
         {
             foreach (var kv in context.ActionArguments)
@@ -67,16 +86,20 @@ public class AuditoriaActionFilter : IAsyncActionFilter
         string? valoresNuevos = null;
         try
         {
+            // Serializa los argumentos de la acción (el body/params del request) y
+            // redacta lo sensible ANTES de convertirlo a string: nunca se debe
+            // materializar en memoria/log una contraseña o token en texto plano.
             var nodo = JsonSerializer.SerializeToNode(context.ActionArguments);
             RedactarSensibles(nodo);
             valoresNuevos = nodo?.ToJsonString();
         }
         catch { /* ignore serialization errors */ }
 
-        // Execute action
+        // Ejecuta la acción real del controller antes de registrar el log, para
+        // que la auditoría no agregue latencia perceptible a la respuesta.
         var executedContext = await next();
 
-        // Build description and IP
+        // Arma descripción e IP de origen para el log
         var descripcion = $"{metodo} {http?.Request?.Path}";
         var ip = http?.Connection?.RemoteIpAddress?.ToString();
 

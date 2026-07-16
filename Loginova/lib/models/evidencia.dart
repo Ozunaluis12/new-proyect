@@ -2,6 +2,8 @@
 class Evidencia {
   final int id;
   final int recogidaId;
+  // URL de la foto subida como comprobante (p. ej. del cobro o del estado
+  // del paquete al momento de la recogida).
   final String fotoUrl;
   final String? comentario;
 

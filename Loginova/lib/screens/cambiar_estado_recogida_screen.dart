@@ -11,6 +11,12 @@ import '../services/recogida_service.dart';
 import '../widgets/llamar_cliente_button.dart';
 import 'registrar_ingreso_screen.dart';
 
+/// Pantalla central del flujo operativo: el operador cambia el estado de una
+/// recogida (Pendiente/Recogida/Cancelada), sube la foto de evidencia
+/// obligatoria y, si corresponde, registra el dinero cobrado. El backend
+/// reasigna aquí mismo el "dueño" de la recogida y el responsable del dinero
+/// a quien hace este cambio de estado (no a quien creó la recogida
+/// originalmente); esta pantalla es la que dispara esa reasignación.
 class CambiarEstadoRecogidaScreen extends StatefulWidget {
   final Recogida recogida;
 
@@ -41,6 +47,9 @@ class _CambiarEstadoRecogidaScreenState
   @override
   void initState() {
     super.initState();
+    // Si el estado actual de la recogida no está entre los permitidos aquí
+    // (p.ej. viene como "Asignada" o "En Ruta"), se arranca en "Pendiente"
+    // como valor seguro por defecto.
     _estadoSeleccionado = _estadosPermitidos.contains(widget.recogida.estado)
         ? widget.recogida.estado
         : 'Pendiente';
@@ -56,6 +65,8 @@ class _CambiarEstadoRecogidaScreenState
     super.dispose();
   }
 
+  /// Abre la cámara para la foto de evidencia; si falla (p.ej. sin permiso
+  /// de cámara o en web sin soporte), cae a la galería como alternativa.
   Future<void> _tomarFoto() async {
     final picker = ImagePicker();
 
@@ -90,6 +101,11 @@ class _CambiarEstadoRecogidaScreenState
     }
   }
 
+  /// Valida y envía el cambio de estado al backend. Contiene las reglas de
+  /// negocio clave de esta pantalla: el dinero solo se puede registrar al
+  /// completar la recogida (estado "Recogida"), la foto de evidencia es
+  /// obligatoria siempre, y la cantidad de paquetes es obligatoria solo al
+  /// completar (porque recién ahí el operador los cuenta con certeza).
   Future<void> _guardar() async {
     double? montoCobrado;
     String? formaPago;
@@ -107,6 +123,8 @@ class _CambiarEstadoRecogidaScreenState
         return;
       }
 
+      // Delega a una pantalla dedicada para capturar monto, forma de pago y
+      // (opcionalmente) su propia foto del comprobante de pago.
       final ingreso = await Navigator.push<IngresoDraft>(
         context,
         MaterialPageRoute(builder: (_) => const RegistrarIngresoScreen()),
@@ -148,6 +166,8 @@ class _CambiarEstadoRecogidaScreenState
     setState(() => _guardando = true);
 
     try {
+      // La foto del comprobante de pago (si existe) reemplaza a la foto de
+      // evidencia general, para no exigir subir dos imágenes distintas.
       final actualizada = await _service.actualizarEstadoRecogida(
         widget.recogida.id,
         estado: _estadoSeleccionado,

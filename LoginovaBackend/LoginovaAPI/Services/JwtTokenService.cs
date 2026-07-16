@@ -6,6 +6,13 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace LoginovaAPI.Services;
 
+/// <summary>
+/// Genera los JWT que autentican a los usuarios frente a la API. El token
+/// incluye claims con el id, correo, nombre y rol del usuario, que luego se
+/// leen en cada request (por ejemplo, <c>userId</c> lo usa <see cref="AuditoriaActionFilter"/>
+/// para saber quién hizo el cambio, y el rol/permisos se validan vía
+/// <see cref="PermisosService"/>).
+/// </summary>
 public class JwtTokenService
 {
     private readonly IConfiguration _configuration;
@@ -15,6 +22,10 @@ public class JwtTokenService
         _configuration = configuration;
     }
 
+    /// <summary>
+    /// Crea y firma (HMAC-SHA256) un JWT para el usuario dado, válido por 8 horas.
+    /// La clave de firma sale de la configuración "Jwt:Key".
+    /// </summary>
     public string CreateToken(Usuario usuario)
     {
         var jwt = _configuration.GetSection("Jwt");

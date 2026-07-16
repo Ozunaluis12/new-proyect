@@ -57,6 +57,9 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
     super.dispose();
   }
 
+  /// Autocompletado de dirección mientras el usuario escribe: espera 300ms
+  /// sin nuevas pulsaciones (debounce) antes de consultar el servicio de
+  /// geocodificación, para no disparar una petición por cada tecla.
   void _onDireccionChanged(String value) {
     final query = value.trim();
 
@@ -92,6 +95,9 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
     );
   }
 
+  /// Busca la dirección escrita al presionar el botón de búsqueda o al
+  /// enviar el campo, y toma el primer resultado como ubicación (a
+  /// diferencia del autocompletado, que solo sugiere).
   Future<void> _buscarDireccionManual() async {
     final query = _direccionController.text.trim();
 
@@ -241,6 +247,8 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
         throw Exception('Sesión inválida');
       }
 
+      // Primero se crea el cliente en el backend (con sus datos de contacto
+      // y dirección) para poder referenciarlo por ID en la recogida.
       // Crear cliente
       final cliente = await ClienteService().crearCliente(
         Cliente(
@@ -668,6 +676,8 @@ class _LocationPickerScreenState extends State<_LocationPickerScreen> {
     super.dispose();
   }
 
+  /// Geocodifica el texto buscado, centra el mapa en el resultado y hace
+  /// reverse geocoding para mostrar la dirección legible correspondiente.
   Future<void> _buscarUbicacionEnMapa() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
@@ -724,6 +734,10 @@ class _LocationPickerScreenState extends State<_LocationPickerScreen> {
     }
   }
 
+  /// Confirma el punto elegido en el mapa y lo devuelve a la pantalla que
+  /// invocó este selector. Si aún no se resolvió la dirección legible del
+  /// punto (p.ej. se tocó el mapa sin buscar), la resuelve aquí antes de
+  /// devolver el resultado.
   Future<void> _confirmarUbicacion() async {
     if (_selectedLocation == null) return;
 

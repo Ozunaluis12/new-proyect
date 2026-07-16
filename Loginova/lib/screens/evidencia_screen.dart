@@ -6,6 +6,11 @@ import 'package:image_picker/image_picker.dart';
 import '../models/evidencia.dart';
 import '../services/evidencia_service.dart';
 
+/// Pantalla independiente para capturar y subir una foto de evidencia
+/// adicional asociada a una recogida (se usa, por ejemplo, desde el botón
+/// "Agregar Evidencia" de [DetalleRecogidaScreen]). Es distinta de la foto
+/// de evidencia que se toma dentro del flujo de cambio de estado
+/// ([CambiarEstadoRecogidaScreen]), que es obligatoria para poder guardar.
 class EvidenciaScreen extends StatefulWidget {
   final int? recogidaId;
 
@@ -21,6 +26,8 @@ class _EvidenciaScreenState extends State<EvidenciaScreen> {
 
   final comentarioController = TextEditingController();
 
+  /// Abre la cámara; si no está disponible (p.ej. web o permisos denegados)
+  /// cae a la galería como alternativa para poder seguir el flujo.
   Future<void> tomarFoto() async {
     final picker = ImagePicker();
 
@@ -55,6 +62,10 @@ class _EvidenciaScreenState extends State<EvidenciaScreen> {
     }
   }
 
+  /// Valida que exista una recogida asociada y una foto tomada, sube la
+  /// evidencia al endpoint autenticado del backend y devuelve la URL de la
+  /// foto guardada a la pantalla anterior (con una breve pausa para que el
+  /// usuario alcance a ver el snackbar de confirmación antes de salir).
   Future<void> guardar() async {
     if (widget.recogidaId == null) {
       ScaffoldMessenger.of(context).showSnackBar(

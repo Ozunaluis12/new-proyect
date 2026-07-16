@@ -112,6 +112,9 @@ public class AuthController : ControllerBase
             return Ok(new { mensaje = respuestaGenerica });
         }
 
+        // Invalida cualquier código anterior sin usar: solo debe quedar vigente el
+        // último código emitido, para que un código viejo filtrado no sirva para
+        // tomar la cuenta si el usuario pidió varios seguidos.
         var tokensPrevios = await _context.PasswordResetTokens
             .Where(item => item.UsuarioId == usuario.Id && !item.Usado)
             .ToListAsync();
@@ -120,6 +123,8 @@ public class AuthController : ControllerBase
             previo.Usado = true;
         }
 
+        // RandomNumberGenerator (criptográficamente seguro) en vez de Random: un
+        // código de recuperación predecible sería un vector de toma de cuenta.
         var codigo = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
         _context.PasswordResetTokens.Add(new PasswordResetToken
         {
@@ -181,6 +186,10 @@ public class AuthController : ControllerBase
         tokenValido.Usado = true;
         usuario.Password = _passwordHasher.Hash(request.NuevaPassword);
 
+        // Tras un reseteo exitoso se invalida cualquier otro código pendiente del
+        // mismo usuario, por si quedó alguno emitido antes que este (evita que un
+        // código previo, aún dentro de su ventana de 15 minutos, se pueda usar
+        // después de que la contraseña ya cambió).
         var otrosTokens = await _context.PasswordResetTokens
             .Where(item => item.UsuarioId == usuario.Id && !item.Usado && item.Id != tokenValido.Id)
             .ToListAsync();
@@ -193,6 +202,12 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Hashea el código de recuperación de 6 dígitos antes de guardarlo en
+    /// PasswordResetTokens. Nunca se guarda el código en texto plano: si la base
+    /// de datos se filtrara, un atacante no podría leer códigos vigentes y usarlos
+    /// para tomar cuentas.
+    /// </summary>
     private static string HashCodigo(string codigo)
     {
         var bytes = System.Text.Encoding.UTF8.GetBytes(codigo);

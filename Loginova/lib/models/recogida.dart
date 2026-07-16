@@ -1,10 +1,19 @@
-/// Modelo que representa una recogida de paquetes en el sistema.
+/// Modelo central de la app: representa una recogida de paquetes de un
+/// cliente. El operador que la atiende cambia su [estado] (Pendiente ->
+/// Recogida/Cancelada) y puede registrar el cobro del dinero asociado.
+/// El operador "dueño" ([usuarioId]) y el responsable del dinero se
+/// reasignan siempre a quien hace el cambio de estado, no a quien la creó.
 class Recogida {
   final int id;
   final int clienteId;
+  // Resuelto por el backend junto con la recogida, para no tener que
+  // consultar aparte el cliente asociado.
   final String? clienteNombre;
   final String? clienteTelefono;
+  // Puede venir nulo desde el backend (p. ej. recogida aún sin operador
+  // asignado), por eso es nullable.
   final int? usuarioId;
+  // Igual que clienteNombre: ya viene resuelto desde el backend.
   final String? usuarioNombre;
   final String estado;
   final int cantidadPaquetes;
@@ -91,7 +100,8 @@ class Recogida {
     };
   }
 
-  /// Obtiene un par [latitud, longitud] si ambas están disponibles
+  /// Obtiene un par [latitud, longitud] si ambas están disponibles,
+  /// para usar directamente en el mapa (OpenStreetMap/Mapbox).
   List<double>? get coordenadas {
     if (latitud != null && longitud != null) {
       return [latitud!, longitud!];
