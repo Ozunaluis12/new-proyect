@@ -19,7 +19,9 @@ scripts/.env.local.ps1
 **/.dart_tool/
 **/.flutter-plugins-dependencies
 **/.packages
-**/pubspec.lock
+
+# pubspec.lock SÍ se versiona: Loginova es una app (no una librería), y Flutter
+# recomienda fijar las versiones exactas de dependencias para builds reproducibles.
 
 # Android build artifacts
 **/android/.gradle/
