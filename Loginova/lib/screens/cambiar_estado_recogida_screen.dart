@@ -8,6 +8,7 @@ import '../constants/permission_constants.dart';
 import '../models/recogida.dart';
 import '../providers/auth_provider.dart';
 import '../services/recogida_service.dart';
+import '../themes/app_theme.dart';
 import '../widgets/llamar_cliente_button.dart';
 import 'registrar_ingreso_screen.dart';
 
@@ -193,6 +194,49 @@ class _CambiarEstadoRecogidaScreenState
     }
   }
 
+  /// Banner con el horario límite de la recogida, en rojo si ya venció o
+  /// ámbar si está por vencer, para que el operador sepa si va con retraso
+  /// antes de guardar el cambio de estado.
+  Widget _buildHorarioLimiteBanner() {
+    final recogida = widget.recogida;
+    final vencido = recogida.horarioVencido;
+    final proximo = recogida.horarioProximoAVencer();
+    final color = vencido
+        ? LoginovaColors.error
+        : proximo
+        ? LoginovaColors.warning
+        : LoginovaColors.textSecondary;
+
+    final fecha = recogida.fechaProgramada!;
+    final dd = fecha.day.toString().padLeft(2, '0');
+    final mm = fecha.month.toString().padLeft(2, '0');
+    final hh = fecha.hour.toString().padLeft(2, '0');
+    final min = fecha.minute.toString().padLeft(2, '0');
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        border: Border.all(color: color),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.schedule, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              vencido
+                  ? 'Horario límite vencido: $dd/$mm $hh:$min'
+                  : 'Horario límite: $dd/$mm $hh:$min',
+              style: TextStyle(color: color, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final usuario = Provider.of<AuthProvider>(context).usuario;
@@ -210,6 +254,10 @@ class _CambiarEstadoRecogidaScreenState
               nombreCliente: widget.recogida.clienteNombre,
               telefono: widget.recogida.clienteTelefono,
             ),
+            if (widget.recogida.fechaProgramada != null) ...[
+              const SizedBox(height: 12),
+              _buildHorarioLimiteBanner(),
+            ],
             const SizedBox(height: 20),
             DropdownButtonFormField<String>(
               initialValue: _estadoSeleccionado,

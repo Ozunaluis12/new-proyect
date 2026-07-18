@@ -60,14 +60,64 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
     ).cargarRecogidas();
   }
 
-  /// Filtra las recogidas según el estado seleccionado
+  /// Filtra las recogidas según el estado seleccionado y las ordena por
+  /// urgencia: primero las que tienen horario límite activo (la más próxima
+  /// a vencer o ya vencida primero), luego el resto en su orden original.
   List<Recogida> _filtrarRecogidas(List<Recogida> recogidas) {
-    if (_filtroEstado == 'Todos') {
-      return recogidas;
+    final filtradas = _filtroEstado == 'Todos'
+        ? List<Recogida>.from(recogidas)
+        : recogidas
+              .where(
+                (r) => r.estado.toLowerCase() == _filtroEstado.toLowerCase(),
+              )
+              .toList();
+
+    final conHorario = filtradas.where((r) => r.tieneHorarioActivo).toList()
+      ..sort((a, b) => a.fechaProgramada!.compareTo(b.fechaProgramada!));
+    final sinHorario = filtradas.where((r) => !r.tieneHorarioActivo).toList();
+
+    return [...conHorario, ...sinHorario];
+  }
+
+  /// Color de fondo de la tarjeta según la urgencia del horario límite:
+  /// rojo si ya venció sin completarse, ámbar si está por vencer, normal
+  /// en cualquier otro caso.
+  Color? _getUrgenciaBackgroundColor(Recogida recogida) {
+    if (recogida.horarioVencido) {
+      return LoginovaColors.error.withValues(alpha: 0.12);
     }
-    return recogidas
-        .where((r) => r.estado.toLowerCase() == _filtroEstado.toLowerCase())
-        .toList();
+    if (recogida.horarioProximoAVencer()) {
+      return LoginovaColors.warning.withValues(alpha: 0.12);
+    }
+    return null;
+  }
+
+  /// Texto corto describiendo cuánto falta o cuánto pasó del horario límite.
+  String _formatearUrgencia(Recogida recogida) {
+    final diferencia = recogida.fechaProgramada!.difference(DateTime.now());
+    final vencido = diferencia.isNegative;
+    final absoluta = diferencia.abs();
+
+    String texto;
+    if (absoluta.inMinutes < 60) {
+      texto = '${absoluta.inMinutes} min';
+    } else if (absoluta.inHours < 24) {
+      texto = '${absoluta.inHours} h';
+    } else {
+      texto = '${absoluta.inDays} día(s)';
+    }
+
+    return vencido ? 'Vencido hace $texto' : 'Vence en $texto';
+  }
+
+  /// Formatea una fecha/hora local como "dd/MM/yyyy HH:mm" sin depender del
+  /// paquete intl.
+  String _formatearFechaHora(DateTime fecha) {
+    final dd = fecha.day.toString().padLeft(2, '0');
+    final mm = fecha.month.toString().padLeft(2, '0');
+    final hh = fecha.hour.toString().padLeft(2, '0');
+    final min = fecha.minute.toString().padLeft(2, '0');
+    return '$dd/$mm/${fecha.year} $hh:$min';
   }
 
   /// Obtiene el color según el estado de la recogida
@@ -205,9 +255,17 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
 
     final color = _getEstadoColor(recogida.estado);
     final icon = _getEstadoIcon(recogida.estado);
+    final urgenciaBackground = _getUrgenciaBackgroundColor(recogida);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: urgenciaBackground,
+      shape: recogida.horarioVencido
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+              side: BorderSide(color: LoginovaColors.error, width: 1.5),
+            )
+          : null,
       child: InkWell(
         onTap: () => _abrirDetalle(recogida),
         child: Padding(
@@ -264,6 +322,57 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
                   ),
                 ],
               ),
+              if (recogida.tieneHorarioActivo) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.schedule,
+                      size: 18,
+                      color: recogida.horarioVencido
+                          ? LoginovaColors.error
+                          : recogida.horarioProximoAVencer()
+                          ? LoginovaColors.warning
+                          : LoginovaColors.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatearUrgencia(recogida),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: recogida.horarioVencido
+                            ? LoginovaColors.error
+                            : recogida.horarioProximoAVencer()
+                            ? LoginovaColors.warning
+                            : LoginovaColors.textSecondary,
+                        fontWeight:
+                            recogida.horarioVencido ||
+                                recogida.horarioProximoAVencer()
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (recogida.fechaRecogida != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      size: 18,
+                      color: LoginovaColors.success,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Completada: ${_formatearFechaHora(recogida.fechaRecogida!)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: LoginovaColors.success,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               const Divider(height: 1),
               const SizedBox(height: 12),

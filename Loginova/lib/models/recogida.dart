@@ -24,6 +24,12 @@ class Recogida {
   final double? latitud; // Ubicación de la recogida
   final double? longitud; // Ubicación de la recogida
   final DateTime? fechaCreacion;
+  // Horario límite acordado con el cliente para completar la recogida.
+  // Opcional: si es null, la recogida no tiene urgencia por horario.
+  final DateTime? fechaProgramada;
+  // Momento en que efectivamente se completó (estado pasó a "Recogida").
+  // Null mientras siga pendiente.
+  final DateTime? fechaRecogida;
 
   /// Constructor que requiere todos los campos de una recogida.
   Recogida({
@@ -42,7 +48,26 @@ class Recogida {
     this.latitud,
     this.longitud,
     this.fechaCreacion,
+    this.fechaProgramada,
+    this.fechaRecogida,
   });
+
+  /// True si tiene horario límite fijado y todavía no se completó ni canceló.
+  bool get tieneHorarioActivo =>
+      fechaProgramada != null &&
+      estado.toLowerCase() != 'recogida' &&
+      estado.toLowerCase() != 'cancelada';
+
+  /// True si el horario límite ya pasó y la recogida sigue sin completarse.
+  bool get horarioVencido =>
+      tieneHorarioActivo && fechaProgramada!.isBefore(DateTime.now());
+
+  /// True si falta poco para el horario límite (dentro de [umbral], 60 min
+  /// por defecto) pero todavía no se venció.
+  bool horarioProximoAVencer({Duration umbral = const Duration(minutes: 60)}) {
+    if (!tieneHorarioActivo || horarioVencido) return false;
+    return fechaProgramada!.difference(DateTime.now()) <= umbral;
+  }
 
   /// Crea una instancia desde un JSON devuelto por el servidor.
   factory Recogida.fromJson(Map<String, dynamic> json) {
@@ -64,6 +89,12 @@ class Recogida {
       fechaCreacion: json['fechaCreacion'] != null
           ? DateTime.parse(json['fechaCreacion'])
           : null,
+      fechaProgramada: json['fechaProgramada'] != null
+          ? DateTime.parse(json['fechaProgramada']).toLocal()
+          : null,
+      fechaRecogida: json['fechaRecogida'] != null
+          ? DateTime.parse(json['fechaRecogida']).toLocal()
+          : null,
     );
   }
 
@@ -82,6 +113,8 @@ class Recogida {
       'latitud': latitud,
       'longitud': longitud,
       'fechaCreacion': fechaCreacion?.toIso8601String(),
+      'fechaProgramada': fechaProgramada?.toUtc().toIso8601String(),
+      'fechaRecogida': fechaRecogida?.toUtc().toIso8601String(),
     };
   }
 
@@ -97,6 +130,7 @@ class Recogida {
       'montoCobrado': montoCobrado,
       'latitud': latitud,
       'longitud': longitud,
+      'fechaProgramada': fechaProgramada?.toUtc().toIso8601String(),
     };
   }
 

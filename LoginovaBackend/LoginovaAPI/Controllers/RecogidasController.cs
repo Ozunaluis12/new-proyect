@@ -142,6 +142,7 @@ public class RecogidasController : ControllerBase
             Longitud = request.Longitud,
             DineroRecibido = request.DineroRecibido,
             MontoCobrado = request.MontoCobrado,
+            FechaProgramada = request.FechaProgramada,
         };
 
         _context.Recogidas.Add(recogida);
@@ -238,6 +239,7 @@ public class RecogidasController : ControllerBase
         recogida.Longitud = request.Longitud;
         recogida.DineroRecibido = request.DineroRecibido;
         recogida.MontoCobrado = request.MontoCobrado;
+        recogida.FechaProgramada = request.FechaProgramada;
 
         await _context.SaveChangesAsync();
 
@@ -522,7 +524,9 @@ public class RecogidasController : ControllerBase
             recogida.Longitud,
             recogida.DineroRecibido,
             recogida.MontoCobrado,
-            recogida.FechaCreacion);
+            recogida.FechaCreacion,
+            recogida.FechaProgramada,
+            recogida.FechaRecogida);
     }
 
     // Delega en PermisosService: valida el permiso puntual del usuario sin importar

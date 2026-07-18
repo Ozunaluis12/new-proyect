@@ -12,7 +12,9 @@ public record RecogidaRequest(
     decimal? Latitud,
     decimal? Longitud,
     bool DineroRecibido,
-    decimal? MontoCobrado);
+    decimal? MontoCobrado,
+    /// <summary>Horario límite acordado con el cliente para completar la recogida. Opcional.</summary>
+    DateTime? FechaProgramada);
 
 /// <summary>
 /// Datos que envía el operador al procesar una recogida (Pendiente → Recogida o
@@ -66,4 +68,8 @@ public record RecogidaResponse(
     decimal? Longitud,
     bool DineroRecibido,
     decimal? MontoCobrado,
-    DateTime? FechaCreacion);
+    DateTime? FechaCreacion,
+    /// <summary>Horario límite acordado con el cliente. Null si no se fijó uno.</summary>
+    DateTime? FechaProgramada,
+    /// <summary>Fecha/hora en que efectivamente se completó (estado pasó a "Recogida"). Null mientras siga pendiente.</summary>
+    DateTime? FechaRecogida);

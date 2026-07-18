@@ -37,6 +37,11 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
   // Controladores de recogida
   final _observacionesController = TextEditingController();
 
+  // Horario límite acordado con el cliente (opcional). Si se fija, la
+  // recogida se prioriza y se marca visualmente cuando está por vencer o
+  // ya venció sin completarse.
+  DateTime? _horarioLimite;
+
   // Ubicación de la recogida
   double? _selectedLatitude;
   double? _selectedLongitude;
@@ -212,6 +217,36 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
     }
   }
 
+  /// Abre selector de fecha y hora para el horario límite de la recogida.
+  Future<void> _seleccionarHorarioLimite() async {
+    final ahora = DateTime.now();
+    final fecha = await showDatePicker(
+      context: context,
+      initialDate: _horarioLimite ?? ahora,
+      firstDate: ahora.subtract(const Duration(days: 1)),
+      lastDate: ahora.add(const Duration(days: 365)),
+    );
+    if (fecha == null || !mounted) return;
+
+    final hora = await showTimePicker(
+      context: context,
+      initialTime: _horarioLimite != null
+          ? TimeOfDay.fromDateTime(_horarioLimite!)
+          : TimeOfDay.fromDateTime(ahora.add(const Duration(hours: 1))),
+    );
+    if (hora == null || !mounted) return;
+
+    setState(() {
+      _horarioLimite = DateTime(
+        fecha.year,
+        fecha.month,
+        fecha.day,
+        hora.hour,
+        hora.minute,
+      );
+    });
+  }
+
   /// Guarda la nueva recogida
   Future<void> _guardarRecogida() async {
     if (!_formKey.currentState!.validate()) {
@@ -274,6 +309,7 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
         latitud: _selectedLatitude,
         longitud: _selectedLongitude,
         fechaCreacion: DateTime.now(),
+        fechaProgramada: _horarioLimite,
       );
 
       await recogidaProvider.agregarRecogida(recogida);
@@ -582,6 +618,8 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
   Widget _buildRecogidaFields() {
     return Column(
       children: [
+        _buildHorarioLimiteSelector(),
+        const SizedBox(height: 16),
         TextFormField(
           controller: _observacionesController,
           textInputAction: TextInputAction.done,
@@ -595,6 +633,75 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
         ),
       ],
     );
+  }
+
+  /// Construye el selector opcional de horario límite. Si se fija, la
+  /// recogida se ordena y colorea por urgencia en la lista.
+  Widget _buildHorarioLimiteSelector() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade400),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _seleccionarHorarioLimite,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.schedule, color: LoginovaColors.primary),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Horario límite (opcional)',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _horarioLimite != null
+                            ? _formatearFechaHora(_horarioLimite!)
+                            : 'Sin horario definido',
+                        style: Theme.of(context).textTheme.labelSmall
+                            ?.copyWith(
+                              color: _horarioLimite != null
+                                  ? LoginovaColors.success
+                                  : LoginovaColors.textSecondary,
+                              fontWeight: _horarioLimite != null
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_horarioLimite != null)
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Quitar horario',
+                    onPressed: () => setState(() => _horarioLimite = null),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Formatea una fecha/hora local como "dd/MM/yyyy HH:mm" sin depender del
+  /// paquete intl.
+  String _formatearFechaHora(DateTime fecha) {
+    final dd = fecha.day.toString().padLeft(2, '0');
+    final mm = fecha.month.toString().padLeft(2, '0');
+    final hh = fecha.hour.toString().padLeft(2, '0');
+    final min = fecha.minute.toString().padLeft(2, '0');
+    return '$dd/$mm/${fecha.year} $hh:$min';
   }
 
   /// Construye los botones de acción

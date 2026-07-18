@@ -303,10 +303,40 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
               'Cantidad de Paquetes',
               '${_recogida.cantidadPaquetes} paquetes',
             ),
+            if (_recogida.fechaProgramada != null) ...[
+              const Divider(height: 16),
+              _buildInfoRow(
+                'Horario límite',
+                _formatearFechaHora(_recogida.fechaProgramada!),
+                valueColor: _recogida.horarioVencido
+                    ? LoginovaColors.error
+                    : _recogida.horarioProximoAVencer()
+                    ? LoginovaColors.warning
+                    : null,
+              ),
+            ],
+            if (_recogida.fechaRecogida != null) ...[
+              const Divider(height: 16),
+              _buildInfoRow(
+                'Completada',
+                _formatearFechaHora(_recogida.fechaRecogida!),
+                valueColor: LoginovaColors.success,
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  /// Formatea una fecha/hora local como "dd/MM/yyyy HH:mm" sin depender del
+  /// paquete intl.
+  String _formatearFechaHora(DateTime fecha) {
+    final dd = fecha.day.toString().padLeft(2, '0');
+    final mm = fecha.month.toString().padLeft(2, '0');
+    final hh = fecha.hour.toString().padLeft(2, '0');
+    final min = fecha.minute.toString().padLeft(2, '0');
+    return '$dd/$mm/${fecha.year} $hh:$min';
   }
 
   Widget _buildInfoCardIngresos() {
@@ -337,7 +367,7 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
   }
 
   /// Construye una fila de información
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, {Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -349,9 +379,10 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
         ),
         Text(
           value,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: valueColor,
+          ),
         ),
       ],
     );

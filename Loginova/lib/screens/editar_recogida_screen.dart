@@ -28,6 +28,7 @@ class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
   late String _estadoSeleccionado;
   late TextEditingController paquetesController;
   late TextEditingController observacionesController;
+  DateTime? _horarioLimite;
   bool guardando = false;
 
   @override
@@ -42,6 +43,47 @@ class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
     observacionesController = TextEditingController(
       text: widget.recogida.observaciones ?? '',
     );
+    _horarioLimite = widget.recogida.fechaProgramada;
+  }
+
+  /// Abre selector de fecha y hora para el horario límite de la recogida.
+  Future<void> _seleccionarHorarioLimite() async {
+    final ahora = DateTime.now();
+    final fecha = await showDatePicker(
+      context: context,
+      initialDate: _horarioLimite ?? ahora,
+      firstDate: ahora.subtract(const Duration(days: 1)),
+      lastDate: ahora.add(const Duration(days: 365)),
+    );
+    if (fecha == null || !mounted) return;
+
+    final hora = await showTimePicker(
+      context: context,
+      initialTime: _horarioLimite != null
+          ? TimeOfDay.fromDateTime(_horarioLimite!)
+          : TimeOfDay.fromDateTime(ahora.add(const Duration(hours: 1))),
+    );
+    if (hora == null || !mounted) return;
+
+    setState(() {
+      _horarioLimite = DateTime(
+        fecha.year,
+        fecha.month,
+        fecha.day,
+        hora.hour,
+        hora.minute,
+      );
+    });
+  }
+
+  /// Formatea una fecha/hora local como "dd/MM/yyyy HH:mm" sin depender del
+  /// paquete intl.
+  String _formatearFechaHora(DateTime fecha) {
+    final dd = fecha.day.toString().padLeft(2, '0');
+    final mm = fecha.month.toString().padLeft(2, '0');
+    final hh = fecha.hour.toString().padLeft(2, '0');
+    final min = fecha.minute.toString().padLeft(2, '0');
+    return '$dd/$mm/${fecha.year} $hh:$min';
   }
 
   @override
@@ -67,14 +109,27 @@ class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
 
     setState(() => guardando = true);
 
+    // Se copian todos los campos que este formulario no edita (ubicación,
+    // dinero cobrado, etc.) para no borrarlos accidentalmente: el backend
+    // reemplaza la recogida completa con lo que se le envíe en Update.
     final actualizado = Recogida(
       id: widget.recogida.id,
       clienteId: widget.recogida.clienteId,
+      clienteNombre: widget.recogida.clienteNombre,
+      clienteTelefono: widget.recogida.clienteTelefono,
       usuarioId: widget.recogida.usuarioId,
+      usuarioNombre: widget.recogida.usuarioNombre,
       estado: _estadoSeleccionado,
       cantidadPaquetes: cantidad,
       observaciones: observacionesController.text.trim(),
       evidencias: widget.recogida.evidencias,
+      dineroRecibido: widget.recogida.dineroRecibido,
+      montoCobrado: widget.recogida.montoCobrado,
+      latitud: widget.recogida.latitud,
+      longitud: widget.recogida.longitud,
+      fechaCreacion: widget.recogida.fechaCreacion,
+      fechaProgramada: _horarioLimite,
+      fechaRecogida: widget.recogida.fechaRecogida,
     );
 
     try {
@@ -140,6 +195,27 @@ class _EditarRecogidaScreenState extends State<EditarRecogidaScreen> {
               decoration: const InputDecoration(
                 labelText: 'Cantidad de paquetes',
               ),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.schedule),
+              title: const Text('Horario límite'),
+              subtitle: Text(
+                _horarioLimite != null
+                    ? _formatearFechaHora(_horarioLimite!)
+                    : 'Sin horario definido',
+              ),
+              trailing: _horarioLimite != null
+                  ? IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Quitar horario',
+                      onPressed: guardando
+                          ? null
+                          : () => setState(() => _horarioLimite = null),
+                    )
+                  : null,
+              onTap: guardando ? null : _seleccionarHorarioLimite,
             ),
             const SizedBox(height: 20),
             TextFormField(
