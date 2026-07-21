@@ -1,3 +1,4 @@
+using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 
@@ -47,6 +48,12 @@ public class EvidenciaStorageService
                 ServiceURL = $"https://{accountId}.r2.cloudflarestorage.com",
                 ForcePathStyle = true,
                 AuthenticationRegion = "auto",
+                // El AWS SDK v4 firma los PutObject con un checksum "trailer"
+                // (STREAMING-...-PAYLOAD-TRAILER) por defecto, que Cloudflare
+                // R2 todavía no soporta. WHEN_REQUIRED vuelve al modo clásico,
+                // compatible con R2 (y con S3 real, que sigue soportándolo).
+                RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+                ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
             });
         }
     }
