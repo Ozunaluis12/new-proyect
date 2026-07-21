@@ -89,13 +89,24 @@ public class EvidenciaStorageService
 
         if (_s3Client is not null)
         {
+            // Se bufferiza completo en memoria (las evidencias están limitadas a
+            // pocos MB) para que el SDK conozca el tamaño exacto de entrada y no
+            // recurra a "chunked streaming" con checksum trailer, un modo que
+            // Cloudflare R2 todavía no soporta (STREAMING-...-PAYLOAD-TRAILER
+            // not implemented) y que sí usa por defecto con streams sin tamaño
+            // fijo conocido de antemano.
+            await using var buffer = new MemoryStream();
+            await contenido.CopyToAsync(buffer);
+            buffer.Position = 0;
+
             await _s3Client.PutObjectAsync(new PutObjectRequest
             {
                 BucketName = _bucketName,
                 Key = key,
-                InputStream = contenido,
+                InputStream = buffer,
                 ContentType = string.IsNullOrWhiteSpace(contentType) ? ObtenerContentType(Path.GetExtension(fileName)) : contentType,
                 AutoCloseStream = false,
+                DisablePayloadSigning = true,
             });
             return;
         }
