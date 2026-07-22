@@ -51,3 +51,5 @@ services:
         sync: false
       - key: Resend__From
         sync: false
+      - key: Licencia__FechaVencimiento
+        sync: false

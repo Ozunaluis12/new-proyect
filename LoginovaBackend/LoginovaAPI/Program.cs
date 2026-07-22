@@ -194,6 +194,37 @@ app.UseExceptionHandler(handler =>
 });
 
 app.UseCors("LoginovaCors");
+
+// Vigencia de licencia por instalación: cada backend de cada cliente puede
+// tener su propia fecha de vencimiento (Licencia:FechaVencimiento). Vacío
+// (el default) significa sin vencimiento. Al pasar la fecha, se bloquea
+// toda la API con un mensaje claro en vez de dejar que falle de forma
+// confusa en cada endpoint; /health queda exento para que el monitoreo de
+// infraestructura siga viendo el servicio como "arriba".
+var licenciaFechaVencimiento = builder.Configuration["Licencia:FechaVencimiento"];
+app.Use(async (context, next) =>
+{
+    if (!string.IsNullOrWhiteSpace(licenciaFechaVencimiento) &&
+        context.Request.Path != "/health" &&
+        DateTime.TryParse(
+            licenciaFechaVencimiento,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+            out var vencimiento) &&
+        DateTime.UtcNow > vencimiento)
+    {
+        context.Response.StatusCode = StatusCodes.Status402PaymentRequired;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            mensaje = "La licencia de este sistema venció. Contacta a tu proveedor para renovarla.",
+        });
+        return;
+    }
+
+    await next();
+});
+
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
