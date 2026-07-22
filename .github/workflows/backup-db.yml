@@ -1,0 +1,33 @@
+name: Backup diario de la base de datos
+
+# Corre en la infraestructura de GitHub (no depende de que Render esté
+# despierto). Genera un dump completo de PostgreSQL y lo sube a Cloudflare
+# R2, en el mismo bucket que las evidencias pero en su propia carpeta.
+on:
+  schedule:
+    - cron: "0 8 * * *" # 03:00 hora Colombia (UTC-5)
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instalar cliente de PostgreSQL
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client awscli
+
+      - name: Generar respaldo
+        run: |
+          set -euo pipefail
+          FECHA=$(date +%Y-%m-%d)
+          echo "ARCHIVO=loginova-$FECHA.dump" >> "$GITHUB_ENV"
+          pg_dump "${{ secrets.BACKUP_DATABASE_URL }}" --format=custom --file="loginova-$FECHA.dump"
+
+      - name: Subir respaldo a Cloudflare R2
+        run: |
+          set -euo pipefail
+          aws s3 cp "$ARCHIVO" "s3://${{ secrets.R2_BUCKET_NAME }}/db-backups/$ARCHIVO" \
+            --endpoint-url "https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
