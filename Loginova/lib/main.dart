@@ -22,6 +22,10 @@ import 'constants/app_constants.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Carga la URL de servidor configurada manualmente (si la hay) antes que
+  // nada: todo lo demás que hable con el backend depende de ApiService.baseUrl.
+  await ApiService.loadServerUrlOverride();
+
   // Carga token de sesión antes de inicializar Firebase para que
   // AuthProvider pueda saber de entrada si ya hay una sesión activa
   // (evita mostrar el login brevemente aunque el usuario ya esté logueado).

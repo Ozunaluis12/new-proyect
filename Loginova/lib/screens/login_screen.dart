@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
 import '../themes/app_theme.dart';
 
 /// Pantalla profesional de inicio de sesión con validaciones y diseño moderno.
@@ -57,6 +58,93 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Abre un diálogo para ver/cambiar la URL del backend que usa esta
+  /// instalación de la app. Pensado para cuando se vende Loginova a varias
+  /// empresas: cada una tiene su propio backend, y un mismo APK compilado
+  /// se reutiliza apuntándolo al servidor correcto desde aquí, sin
+  /// recompilar. El cambio aplica de inmediato (no hace falta reiniciar).
+  Future<void> _mostrarConfiguracionServidor() async {
+    final controller = TextEditingController(
+      text: ApiService.serverUrlOverride ?? '',
+    );
+    final formKey = GlobalKey<FormState>();
+
+    final resultado = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Configurar servidor'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Servidor actual en uso:\n${ApiService.baseUrl}',
+                style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
+                  color: LoginovaColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: controller,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'URL del servidor',
+                  hintText: 'https://tuempresa-api.onrender.com/api',
+                ),
+                validator: (value) {
+                  final texto = value?.trim() ?? '';
+                  if (texto.isEmpty) {
+                    return null; // Vacío = volver al valor por defecto.
+                  }
+                  if (!texto.startsWith('http://') &&
+                      !texto.startsWith('https://')) {
+                    return 'Debe empezar con http:// o https://';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogContext, controller.text.trim());
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+
+    // El usuario canceló el diálogo: no hacer nada.
+    if (resultado == null) return;
+
+    await ApiService.setServerUrlOverride(
+      resultado.isEmpty ? null : resultado,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          resultado.isEmpty
+              ? 'Servidor restablecido al predeterminado'
+              : 'Servidor actualizado: $resultado',
+        ),
+        backgroundColor: LoginovaColors.success,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -65,32 +153,51 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: LoginovaColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 20 : 40,
-              vertical: 20,
-            ),
-            child: SizedBox(
-              height: size.height - 40,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo y Título
-                  _buildHeader(),
-                  SizedBox(height: isMobile ? 40 : 50),
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 20 : 40,
+                  vertical: 20,
+                ),
+                child: SizedBox(
+                  height: size.height - 40,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Logo y Título
+                      _buildHeader(),
+                      SizedBox(height: isMobile ? 40 : 50),
 
-                  // Formulario
-                  _buildLoginForm(),
+                      // Formulario
+                      _buildLoginForm(),
 
-                  SizedBox(height: isMobile ? 30 : 40),
+                      SizedBox(height: isMobile ? 30 : 40),
 
-                  // Links adicionales
-                  _buildAdditionalLinks(),
-                ],
+                      // Links adicionales
+                      _buildAdditionalLinks(),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
+            // Permite que esta misma instalación de la app apunte a un
+            // backend distinto (ej. una empresa cliente distinta), sin
+            // necesidad de recompilar el APK.
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.settings_outlined,
+                  color: LoginovaColors.textSecondary,
+                ),
+                tooltip: 'Configurar servidor',
+                onPressed: _mostrarConfiguracionServidor,
+              ),
+            ),
+          ],
         ),
       ),
     );
