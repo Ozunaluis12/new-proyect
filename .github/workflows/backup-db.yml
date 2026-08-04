@@ -13,7 +13,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Instalar cliente de PostgreSQL
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client awscli
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Instalar AWS CLI
+        # El paquete "awscli" de apt ya no existe en Ubuntu 24.04 (runner de
+        # GitHub Actions); se usa el instalador oficial de AWS en su lugar.
+        run: |
+          curl -sS "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+          unzip -q awscliv2.zip
+          sudo ./aws/install
 
       - name: Generar respaldo
         run: |
