@@ -12,10 +12,19 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Instalar cliente de PostgreSQL
-        # El AWS CLI ya viene preinstalado en el runner ubuntu-latest; solo
-        # falta el cliente de PostgreSQL para pg_dump.
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Instalar cliente de PostgreSQL 18
+        # pg_dump exige que la version del cliente sea >= la del servidor.
+        # Render corre PostgreSQL 18, pero el paquete "postgresql-client" por
+        # defecto de Ubuntu trae la v16; se agrega el repositorio oficial de
+        # PGDG para instalar la v18 exacta. El AWS CLI ya viene preinstalado
+        # en el runner, no hace falta instalarlo.
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
 
       - name: Generar respaldo
         run: |
