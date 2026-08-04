@@ -17,6 +17,7 @@ import '../screens/acerca_screen.dart';
 import '../screens/auditoria_screen.dart';
 import '../screens/historial_estados_screen.dart';
 import '../screens/historial_cierres_screen.dart';
+import '../screens/empresas_clientes_screen.dart';
 
 /// Definición de todas las rutas nombradas de la aplicación, incluyendo
 /// los "guards" que restringen el acceso a ciertas pantallas según si
@@ -84,5 +85,6 @@ class AppRoutes {
     '/historial-cierres': _authGuard(
       (context) => const HistorialCierresScreen(),
     ),
+    '/soporte': _adminGuard((context) => const EmpresasClientesScreen()),
   };
 }

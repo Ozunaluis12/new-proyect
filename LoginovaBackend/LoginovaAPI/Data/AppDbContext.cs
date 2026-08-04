@@ -58,6 +58,9 @@ public class AppDbContext : DbContext
     public DbSet<PasswordResetToken> PasswordResetTokens =>
         Set<PasswordResetToken>();
 
+    public DbSet<EmpresaCliente> EmpresasClientes =>
+        Set<EmpresaCliente>();
+
     /// <summary>
     /// Configura el mapeo de entidades a tablas (nombres en snake_case),
     /// relaciones/claves foráneas y sus reglas de borrado, índices para las
@@ -233,5 +236,13 @@ public class AppDbContext : DbContext
             .HasIndex(log => new { log.EntidadTipo, log.EntidadId });
         modelBuilder.Entity<AuditoriaLog>()
             .HasIndex(log => log.Accion);
+
+        // CRM interno del vendedor: se consulta constantemente ordenado/filtrado
+        // por vencimiento de membresía para priorizar seguimiento.
+        modelBuilder.Entity<EmpresaCliente>().ToTable("empresas_clientes");
+        modelBuilder.Entity<EmpresaCliente>()
+            .HasIndex(empresa => empresa.FechaFinMembresia);
+        modelBuilder.Entity<EmpresaCliente>()
+            .HasIndex(empresa => empresa.Activa);
     }
 }

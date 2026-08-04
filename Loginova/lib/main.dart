@@ -10,6 +10,7 @@ import 'providers/recogida_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/maps_provider.dart';
 import 'providers/proximity_provider.dart';
+import 'providers/empresas_clientes_provider.dart';
 import 'themes/app_theme.dart';
 import 'services/firebase_service.dart';
 import 'services/maps_service.dart';
@@ -64,6 +65,7 @@ class LoginovaApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LocationProvider()),
         ChangeNotifierProvider(create: (_) => MapsProvider()),
         ChangeNotifierProvider(create: (_) => ProximityProvider()),
+        ChangeNotifierProvider(create: (_) => EmpresasClientesProvider()),
       ],
 
       /// Configuración de la aplicación con rutas nombradas.

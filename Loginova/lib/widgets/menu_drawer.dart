@@ -92,6 +92,13 @@ class MenuDrawer extends StatelessWidget {
                       Icons.fact_check,
                       'Auditoría',
                     ),
+                  if (isAdmin)
+                    _buildTile(
+                      context,
+                      '/soporte',
+                      Icons.support_agent,
+                      'Panel de Soporte',
+                    ),
                   if (puedeVerCierres)
                     _buildTile(
                       context,
