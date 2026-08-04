@@ -31,7 +31,11 @@ jobs:
           set -euo pipefail
           FECHA=$(date +%Y-%m-%d)
           echo "ARCHIVO=loginova-$FECHA.dump" >> "$GITHUB_ENV"
-          pg_dump "${{ secrets.BACKUP_DATABASE_URL }}" --format=custom --file="loginova-$FECHA.dump"
+          # El runner ya trae postgresql-client-16 preinstalado, y el
+          # "pg_dump" genérico del PATH sigue resolviendo a esa versión
+          # aunque se instale la 18 al lado; se invoca el binario de la
+          # v18 por su ruta completa para evitar la ambigüedad.
+          /usr/lib/postgresql/18/bin/pg_dump "${{ secrets.BACKUP_DATABASE_URL }}" --format=custom --file="loginova-$FECHA.dump"
 
       - name: Subir respaldo a Cloudflare R2
         run: |
