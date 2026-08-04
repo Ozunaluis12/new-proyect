@@ -20,6 +20,10 @@ CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHttpContextAccessor();
+// Multi-tenant: resuelve la empresa del request actual (claim "empresaId"
+// del JWT). AppDbContext lo usa para los filtros de consulta globales que
+// aíslan los datos de cada empresa entre sí.
+builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<AuditoriaActionFilter>();
 builder.Services.AddControllers(options =>
 {
@@ -66,7 +70,7 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // Login, registro y recuperación de contraseña son los blancos típicos de fuerza bruta.
+    // Login y recuperación de contraseña son los blancos típicos de fuerza bruta.
     options.AddFixedWindowLimiter("auth", limiterOptions =>
     {
         limiterOptions.PermitLimit = 10;
@@ -194,39 +198,43 @@ app.UseExceptionHandler(handler =>
 });
 
 app.UseCors("LoginovaCors");
+app.UseRateLimiter();
+app.UseAuthentication();
 
-// Vigencia de licencia por instalación: cada backend de cada cliente puede
-// tener su propia fecha de vencimiento (Licencia:FechaVencimiento). Vacío
-// (el default) significa sin vencimiento. Al pasar la fecha, se bloquea
-// toda la API con un mensaje claro en vez de dejar que falle de forma
-// confusa en cada endpoint; /health queda exento para que el monitoreo de
-// infraestructura siga viendo el servicio como "arriba".
-var licenciaFechaVencimiento = builder.Configuration["Licencia:FechaVencimiento"];
+// Vigencia de membresía por empresa (multi-tenant): si la empresa del
+// usuario autenticado está suspendida (Soporte) o su membresía ya venció,
+// se bloquea toda la API con un mensaje claro en vez de dejar que falle de
+// forma confusa en cada endpoint. /health queda exento para que el
+// monitoreo de infraestructura siga viendo el servicio como "arriba", y el
+// rol Soporte (sin claim empresaId) nunca lo dispara.
 app.Use(async (context, next) =>
 {
-    if (!string.IsNullOrWhiteSpace(licenciaFechaVencimiento) &&
-        context.Request.Path != "/health" &&
-        DateTime.TryParse(
-            licenciaFechaVencimiento,
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-            out var vencimiento) &&
-        DateTime.UtcNow > vencimiento)
+    if (context.Request.Path != "/health" && context.User.Identity?.IsAuthenticated == true)
     {
-        context.Response.StatusCode = StatusCodes.Status402PaymentRequired;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsJsonAsync(new
+        var empresaIdClaim = context.User.FindFirst("empresaId")?.Value;
+        if (int.TryParse(empresaIdClaim, out var empresaId))
         {
-            mensaje = "La licencia de este sistema venció. Contacta a tu proveedor para renovarla.",
-        });
-        return;
+            var dbContext = context.RequestServices.GetRequiredService<AppDbContext>();
+            var empresa = await dbContext.Empresas
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.Id == empresaId);
+
+            if (empresa is null || !empresa.Activa || empresa.FechaFinMembresia < DateTime.UtcNow)
+            {
+                context.Response.StatusCode = StatusCodes.Status402PaymentRequired;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    mensaje = "Tu membresía está suspendida o vencida. Contacta a soporte para renovarla.",
+                });
+                return;
+            }
+        }
     }
 
     await next();
 });
 
-app.UseRateLimiter();
-app.UseAuthentication();
 app.UseAuthorization();
 
 // Las evidencias viven fuera de wwwroot a propósito: solo se sirven a través de

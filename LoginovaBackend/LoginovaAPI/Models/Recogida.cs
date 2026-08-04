@@ -12,10 +12,14 @@ namespace LoginovaAPI.Models;
 /// completó, el control de la recogida queda a nombre de quien realmente la hizo.
 /// </summary>
 [Table("recogidas")]
-public class Recogida
+public class Recogida : ITenantOwned
 {
     [Column("id")]
     public int Id { get; set; }
+
+    /// <summary>Empresa (tenant) a la que pertenece esta recogida. Ver <see cref="ITenantOwned"/>.</summary>
+    [Column("empresa_id")]
+    public int EmpresaId { get; set; }
 
     [Column("cliente_id")]
     public int ClienteId { get; set; }

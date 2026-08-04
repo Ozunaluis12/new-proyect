@@ -1,14 +1,13 @@
-/// Empresa que compró Loginova (CRM interno del vendedor, no un cliente de
-/// recogidas). Cada una corre su propia instalación independiente; este
-/// modelo solo existe en la instalación del vendedor para llevar control de
-/// membresías, contacto y seguimiento.
-class EmpresaCliente {
+/// Empresa cliente del sistema multi-tenant (tenant real, no un simple
+/// registro de CRM): cada una es una organización que compró Loginova y
+/// cuyos datos (recogidas, clientes, usuarios, etc.) están aislados del
+/// resto de empresas en el mismo backend. Solo lo administra el rol Soporte.
+class Empresa {
   final int id;
   final String nombreEmpresa;
   final String? nombreContacto;
   final String? telefonoContacto;
   final String? correoContacto;
-  final String? urlInstalacion;
   final DateTime fechaInicioMembresia;
   final DateTime fechaFinMembresia;
   final double? montoMembresia;
@@ -17,19 +16,18 @@ class EmpresaCliente {
   final bool activa;
   final DateTime? ultimoRecordatorioEnviado;
   final DateTime fechaCreacion;
-  // Calculados por el backend: "Vencida", "PorVencer" o "Vigente", y los
-  // días restantes (negativo si ya venció). Se guardan tal cual en vez de
-  // recalcularlos en el cliente para no duplicar la regla de negocio.
+  // Calculados por el backend: "Suspendida", "Vencida", "PorVencer" o
+  // "Vigente", y los días restantes (negativo si ya venció). Se guardan tal
+  // cual en vez de recalcularlos en el cliente para no duplicar la regla.
   final String estadoMembresia;
   final int diasParaVencimiento;
 
-  EmpresaCliente({
+  Empresa({
     required this.id,
     required this.nombreEmpresa,
     this.nombreContacto,
     this.telefonoContacto,
     this.correoContacto,
-    this.urlInstalacion,
     required this.fechaInicioMembresia,
     required this.fechaFinMembresia,
     this.montoMembresia,
@@ -42,14 +40,13 @@ class EmpresaCliente {
     required this.diasParaVencimiento,
   });
 
-  factory EmpresaCliente.fromJson(Map<String, dynamic> json) {
-    return EmpresaCliente(
+  factory Empresa.fromJson(Map<String, dynamic> json) {
+    return Empresa(
       id: json['id'],
       nombreEmpresa: json['nombreEmpresa'],
       nombreContacto: json['nombreContacto'],
       telefonoContacto: json['telefonoContacto'],
       correoContacto: json['correoContacto'],
-      urlInstalacion: json['urlInstalacion'],
       fechaInicioMembresia: DateTime.parse(
         json['fechaInicioMembresia'],
       ).toLocal(),
@@ -67,19 +64,20 @@ class EmpresaCliente {
     );
   }
 
-  Map<String, dynamic> toRequestJson() {
+  /// Cuerpo para actualizar una empresa existente (PUT /api/empresas/{id}).
+  /// No incluye "activa": eso se controla solo con los endpoints dedicados
+  /// activar/suspender, nunca editando el resto de los datos.
+  Map<String, dynamic> toUpdateRequestJson() {
     return {
       'nombreEmpresa': nombreEmpresa,
       'nombreContacto': nombreContacto,
       'telefonoContacto': telefonoContacto,
       'correoContacto': correoContacto,
-      'urlInstalacion': urlInstalacion,
       'fechaInicioMembresia': fechaInicioMembresia.toUtc().toIso8601String(),
       'fechaFinMembresia': fechaFinMembresia.toUtc().toIso8601String(),
       'montoMembresia': montoMembresia,
       'cicloPago': cicloPago,
       'notas': notas,
-      'activa': activa,
     };
   }
 }

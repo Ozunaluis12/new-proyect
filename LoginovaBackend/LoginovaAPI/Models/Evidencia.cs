@@ -6,11 +6,15 @@ namespace LoginovaAPI.Models;
 /// Modelo que representa una evidencia (foto) de una recogida.
 /// </summary>
 [Table("evidencias")]
-public class Evidencia
+public class Evidencia : ITenantOwned
 {
     /// <summary>Identificador unico de la evidencia.</summary>
     [Column("id")]
     public int Id { get; set; }
+
+    /// <summary>Empresa (tenant) a la que pertenece esta evidencia. Ver <see cref="ITenantOwned"/>.</summary>
+    [Column("empresa_id")]
+    public int EmpresaId { get; set; }
 
     /// <summary>Identificador de la recogida asociada.</summary>
     [Column("recogida_id")]

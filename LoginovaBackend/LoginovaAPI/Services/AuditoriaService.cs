@@ -10,10 +10,12 @@ namespace LoginovaAPI.Services;
 public class AuditoriaService
 {
     private readonly AppDbContext _context;
+    private readonly ITenantContext _tenant;
 
-    public AuditoriaService(AppDbContext context)
+    public AuditoriaService(AppDbContext context, ITenantContext tenant)
     {
         _context = context;
+        _tenant = tenant;
     }
 
     /// <summary>
@@ -31,6 +33,11 @@ public class AuditoriaService
     {
         var log = new AuditoriaLog
         {
+            // EmpresaId es nullable: null para acciones de Soporte (crear/
+            // activar/suspender empresas), que no pertenecen a ninguna. No hay
+            // red de seguridad de auto-estampado para esto (AuditoriaLog no es
+            // ITenantOwned), así que se estampa explícito aquí.
+            EmpresaId = _tenant.EmpresaId,
             UsuarioId = usuarioId,
             EntidadTipo = entidadTipo,
             EntidadId = entidadId,

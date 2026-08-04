@@ -64,29 +64,6 @@ class AuthProvider extends ChangeNotifier {
     return true;
   }
 
-  /// Registra un usuario nuevo y actualiza el estado local si tiene éxito.
-  Future<bool> register(String nombre, String correo, String password) async {
-    _cargando = true;
-    _error = null;
-    notifyListeners();
-
-    final result = await _authService.register(nombre, correo, password);
-    _cargando = false;
-
-    if (result == null) {
-      _logueado = false;
-      _usuario = null;
-      _error = 'No se pudo registrar el usuario';
-      notifyListeners();
-      return false;
-    }
-
-    _logueado = true;
-    _usuario = result.usuario;
-    notifyListeners();
-    return true;
-  }
-
   /// Solicita el código de recuperación de contraseña al correo indicado.
   Future<bool> solicitarCodigoRecuperacion(String correo) async {
     _cargando = true;

@@ -6,11 +6,15 @@ namespace LoginovaAPI.Models;
 /// Modelo que representa una notificación push enviada a un usuario.
 /// </summary>
 [Table("notificaciones")]
-public class Notificacion
+public class Notificacion : ITenantOwned
 {
     /// <summary>Identificador único de la notificación.</summary>
     [Column("id")]
     public int Id { get; set; }
+
+    /// <summary>Empresa (tenant) a la que pertenece esta notificación. Ver <see cref="ITenantOwned"/>.</summary>
+    [Column("empresa_id")]
+    public int EmpresaId { get; set; }
 
     /// <summary>Identificador del usuario destinatario.</summary>
     [Column("usuario_id")]

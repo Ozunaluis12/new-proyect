@@ -26,12 +26,14 @@ public class IngresosController : ControllerBase
     private readonly AppDbContext _context;
     private readonly PermisosService _permisosService;
     private readonly IConfiguration _configuration;
+    private readonly ITenantContext _tenant;
 
-    public IngresosController(AppDbContext context, PermisosService permisosService, IConfiguration configuration)
+    public IngresosController(AppDbContext context, PermisosService permisosService, IConfiguration configuration, ITenantContext tenant)
     {
         _context = context;
         _permisosService = permisosService;
         _configuration = configuration;
+        _tenant = tenant;
     }
 
     /// <summary>
@@ -345,26 +347,41 @@ public class IngresosController : ControllerBase
             return Unauthorized();
         }
 
-        var operadoresConPendientes = await _context.Set<Models.Ingreso>()
-            .Where(i => i.CierreCajaId == null)
-            .Select(i => i.ResponsableUsuarioId)
-            .Distinct()
+        // Sin JWT no hay empresa ambiente (ITenantContext.EmpresaId sería null,
+        // y el filtro de tenant no encontraría nada). Se recorre cada empresa
+        // activa y se "impersona" su tenant asignando _tenant.EmpresaId antes
+        // de consultar: así el cron reutiliza el mismo filtro seguro que un
+        // request normal, en vez de operar sin aislamiento entre empresas.
+        var empresasActivas = await _context.Empresas
+            .Where(e => e.Activa)
+            .Select(e => e.Id)
             .ToListAsync();
 
         var cierres = new List<CierreCajaResponse>();
-        foreach (var operadorId in operadoresConPendientes)
+        foreach (var empresaId in empresasActivas)
         {
-            // creadoPor: 0 es el valor centinela para "sin usuario" (no hay un
-            // admin logueado disparando esto, es el cron).
-            var cierre = await CerrarCajaOperadorAsync(
-                operadorId,
-                creadoPor: 0,
-                automatico: true,
-                observaciones: "Cierre automático (11:59pm Colombia)");
+            _tenant.EmpresaId = empresaId;
 
-            if (cierre is not null)
+            var operadoresConPendientes = await _context.Set<Models.Ingreso>()
+                .Where(i => i.CierreCajaId == null)
+                .Select(i => i.ResponsableUsuarioId)
+                .Distinct()
+                .ToListAsync();
+
+            foreach (var operadorId in operadoresConPendientes)
             {
-                cierres.Add(cierre);
+                // creadoPor: 0 es el valor centinela para "sin usuario" (no hay un
+                // admin logueado disparando esto, es el cron).
+                var cierre = await CerrarCajaOperadorAsync(
+                    operadorId,
+                    creadoPor: 0,
+                    automatico: true,
+                    observaciones: "Cierre automático (11:59pm Colombia)");
+
+                if (cierre is not null)
+                {
+                    cierres.Add(cierre);
+                }
             }
         }
 

@@ -49,7 +49,13 @@ public class AuthController : ControllerBase
     /// </summary>
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest request)
     {
+        // IgnoreQueryFilters: en este punto todavía no hay token (no hay
+        // empresaId ambiente), así que el filtro global de tenant sobre
+        // Usuario filtraría a "sin empresa" y solo encontraría cuentas
+        // Soporte. El login busca por correo en TODAS las empresas — el
+        // correo es único a nivel global justo para que esto sea seguro.
         var usuario = await _context.Usuarios
+            .IgnoreQueryFilters()
             .Include(item => item.Role)
             .SingleOrDefaultAsync(item => item.Correo == request.Correo);
 
@@ -59,41 +65,6 @@ public class AuthController : ControllerBase
         }
 
         return Ok(CreateAuthResponse(usuario));
-    }
-
-    [HttpPost("register")]
-    /// <summary>
-    /// Crea un nuevo usuario con la contraseña hasheada y rol asignado.
-    /// </summary>
-    public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
-    {
-        var exists = await _context.Usuarios.AnyAsync(item => item.Correo == request.Correo);
-        if (exists)
-        {
-            return Conflict(new { mensaje = "El correo ya esta registrado" });
-        }
-
-        var roleName = "Cliente";
-        var role = await _context.Roles.SingleOrDefaultAsync(r => r.Nombre == roleName);
-        if (role is null)
-        {
-            return BadRequest(new { mensaje = $"Rol invalido: {roleName}" });
-        }
-
-        var usuario = new Usuario
-        {
-            Nombre = request.Nombre,
-            Correo = request.Correo,
-            Password = _passwordHasher.Hash(request.Password),
-            RoleId = role.Id,
-            PermisosJson = "[]",
-        };
-
-        _context.Usuarios.Add(usuario);
-        await _context.SaveChangesAsync();
-
-        usuario.Role = role;
-        return CreatedAtAction(nameof(Register), CreateAuthResponse(usuario));
     }
 
     [HttpPost("forgot-password")]
@@ -106,7 +77,11 @@ public class AuthController : ControllerBase
     {
         const string respuestaGenerica = "Si el correo está registrado, enviamos un código de recuperación.";
 
-        var usuario = await _context.Usuarios.SingleOrDefaultAsync(item => item.Correo == request.Correo);
+        // IgnoreQueryFilters: mismo motivo que en Login, todavía no hay
+        // empresaId ambiente en este request sin autenticar.
+        var usuario = await _context.Usuarios
+            .IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item => item.Correo == request.Correo);
         if (usuario is null)
         {
             return Ok(new { mensaje = respuestaGenerica });
@@ -163,7 +138,9 @@ public class AuthController : ControllerBase
     /// </summary>
     public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
     {
-        var usuario = await _context.Usuarios.SingleOrDefaultAsync(item => item.Correo == request.Correo);
+        var usuario = await _context.Usuarios
+            .IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item => item.Correo == request.Correo);
         if (usuario is null)
         {
             return BadRequest(new { mensaje = "Código inválido o expirado" });

@@ -11,10 +11,14 @@ namespace LoginovaAPI.Models;
 /// la recogida, el dinero queda a nombre de quien realmente la hizo.
 /// </summary>
 [Table("ingresos")]
-public class Ingreso
+public class Ingreso : ITenantOwned
 {
     [Column("id")]
     public int Id { get; set; }
+
+    /// <summary>Empresa (tenant) a la que pertenece este ingreso. Ver <see cref="ITenantOwned"/>.</summary>
+    [Column("empresa_id")]
+    public int EmpresaId { get; set; }
 
     /// <summary>Recogida que generó este cobro.</summary>
     [Column("recogida_id")]

@@ -23,12 +23,14 @@ public class UsuariosController : ControllerBase
     private readonly AppDbContext _context;
     private readonly PasswordHasher _passwordHasher;
     private readonly AuditoriaService _auditoria;
+    private readonly ITenantContext _tenant;
 
-    public UsuariosController(AppDbContext context, PasswordHasher passwordHasher, AuditoriaService auditoria)
+    public UsuariosController(AppDbContext context, PasswordHasher passwordHasher, AuditoriaService auditoria, ITenantContext tenant)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _auditoria = auditoria;
+        _tenant = tenant;
     }
 
     /// <summary>Obtiene todos los usuarios del sistema junto con su rol y permisos asignados.</summary>
@@ -59,7 +61,10 @@ public class UsuariosController : ControllerBase
     [Authorize(Roles = "Administrador")]
     public async Task<ActionResult<UsuarioResponse>> Create(UsuarioCreateRequest request)
     {
-        if (await _context.Usuarios.AnyAsync(usuario => usuario.Correo == request.Correo))
+        // IgnoreQueryFilters: el correo es único a nivel global (todas las
+        // empresas), no solo dentro de la empresa actual, así que el
+        // chequeo de duplicado debe mirar más allá del filtro de tenant.
+        if (await _context.Usuarios.IgnoreQueryFilters().AnyAsync(usuario => usuario.Correo == request.Correo))
         {
             return Conflict(new { mensaje = "El correo ya esta registrado" });
         }
@@ -86,6 +91,10 @@ public class UsuariosController : ControllerBase
 
         var usuario = new Usuario
         {
+            // Usuario es nullable en EmpresaId (por Soporte), así que no
+            // tiene la red de seguridad de auto-estampado de SaveChangesAsync:
+            // hay que fijarlo explícito con la empresa del admin que crea.
+            EmpresaId = _tenant.EmpresaId,
             Nombre = request.Nombre,
             Correo = request.Correo,
             Password = _passwordHasher.Hash(request.Password),
@@ -129,7 +138,7 @@ public class UsuariosController : ControllerBase
             return NotFound();
         }
 
-        if (await _context.Usuarios.AnyAsync(u => u.Correo == request.Correo && u.Id != id))
+        if (await _context.Usuarios.IgnoreQueryFilters().AnyAsync(u => u.Correo == request.Correo && u.Id != id))
         {
             return Conflict(new { mensaje = "El correo ya esta registrado por otro usuario" });
         }

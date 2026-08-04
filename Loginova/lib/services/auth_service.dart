@@ -12,9 +12,10 @@ class AuthResult {
   AuthResult({required this.token, required this.usuario});
 }
 
-/// Servicio que gestiona las peticiones de autenticación al backend: login,
-/// registro y el flujo de dos pasos de recuperación de contraseña (solicitar
-/// código por correo y luego resetear con ese código).
+/// Servicio que gestiona las peticiones de autenticación al backend: login
+/// y el flujo de dos pasos de recuperación de contraseña (solicitar código
+/// por correo y luego resetear con ese código). No hay registro público:
+/// toda cuenta nueva la crea un Administrador o Soporte.
 class AuthService {
   /// Envía la solicitud de inicio de sesión al backend y guarda la sesión si es exitosa.
   Future<AuthResult?> login(String correo, String password) async {
@@ -34,36 +35,6 @@ class AuthService {
 
     await ApiService.saveSession(token, jsonEncode(usuario.toJson()));
 
-    return AuthResult(token: token, usuario: usuario);
-  }
-
-  /// Registra un usuario nuevo en el backend y guarda la sesión al recibir el token.
-  Future<AuthResult?> register(
-    String nombre,
-    String correo,
-    String password, {
-    String rol = 'Cliente',
-  }) async {
-    final response = await http.post(
-      Uri.parse('${ApiService.baseUrl}/auth/register'),
-      headers: ApiService.jsonHeaders,
-      body: jsonEncode({
-        'nombre': nombre,
-        'correo': correo,
-        'password': password,
-        'rol': rol,
-      }),
-    );
-
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      return null;
-    }
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final token = data['token'] as String;
-    final usuario = Usuario.fromJson(data['usuario']);
-
-    await ApiService.saveSession(token, jsonEncode(usuario.toJson()));
     return AuthResult(token: token, usuario: usuario);
   }
 

@@ -31,15 +31,24 @@ public class JwtTokenService
         var jwt = _configuration.GetSection("Jwt");
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, usuario.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, usuario.Correo),
-            new Claim("userId", usuario.Id.ToString()),
-            new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
-            new Claim(ClaimTypes.Name, usuario.Nombre),
-            new Claim(ClaimTypes.Role, usuario.Rol),
+            new(JwtRegisteredClaimNames.Sub, usuario.Id.ToString()),
+            new(JwtRegisteredClaimNames.Email, usuario.Correo),
+            new("userId", usuario.Id.ToString()),
+            new(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+            new(ClaimTypes.Name, usuario.Nombre),
+            new(ClaimTypes.Role, usuario.Rol),
         };
+
+        // Ancla multi-tenant: de aquí lee ITenantContext la empresa del
+        // request para que los filtros de consulta globales de AppDbContext
+        // aíslen los datos. Ausente (no se agrega el claim) para el rol
+        // Soporte, que no pertenece a ninguna empresa.
+        if (usuario.EmpresaId.HasValue)
+        {
+            claims.Add(new Claim("empresaId", usuario.EmpresaId.Value.ToString()));
+        }
 
         var token = new JwtSecurityToken(
             issuer: jwt["Issuer"],

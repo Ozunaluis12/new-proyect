@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/empresa_cliente.dart';
-import '../providers/empresas_clientes_provider.dart';
+import '../models/empresa.dart';
+import '../providers/empresas_provider.dart';
 import '../themes/app_theme.dart';
 
-/// Formulario para registrar o editar una empresa cliente del CRM interno
-/// de soporte (fechas de membresía, contacto, notas de seguimiento).
+/// Formulario del Panel de Soporte para registrar o editar una empresa
+/// (tenant). Al crear, pide además los datos de su primer Administrador
+/// (quien "compra" el servicio y luego crea sus propios operadores); al
+/// editar, solo se tocan los datos de la empresa y su membresía.
 class CrearEditarEmpresaScreen extends StatefulWidget {
   /// Si viene null, es creación; si trae una empresa, es edición.
-  final EmpresaCliente? empresa;
+  final Empresa? empresa;
 
   const CrearEditarEmpresaScreen({super.key, this.empresa});
 
@@ -25,14 +27,17 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
   late final TextEditingController _nombreContactoController;
   late final TextEditingController _telefonoController;
   late final TextEditingController _correoController;
-  late final TextEditingController _urlController;
   late final TextEditingController _montoController;
   late final TextEditingController _notasController;
+
+  late final TextEditingController _adminNombreController;
+  late final TextEditingController _adminCorreoController;
+  late final TextEditingController _adminPasswordController;
+  bool _mostrarAdminPassword = false;
 
   String _cicloPago = 'Mensual';
   late DateTime _fechaInicio;
   late DateTime _fechaFin;
-  late bool _activa;
   bool _guardando = false;
 
   bool get _editando => widget.empresa != null;
@@ -54,7 +59,6 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
     _correoController = TextEditingController(
       text: empresa?.correoContacto ?? '',
     );
-    _urlController = TextEditingController(text: empresa?.urlInstalacion ?? '');
     _montoController = TextEditingController(
       text: empresa?.montoMembresia != null
           ? empresa!.montoMembresia!.toStringAsFixed(0)
@@ -62,12 +66,15 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
     );
     _notasController = TextEditingController(text: empresa?.notas ?? '');
 
+    _adminNombreController = TextEditingController();
+    _adminCorreoController = TextEditingController();
+    _adminPasswordController = TextEditingController();
+
     _cicloPago = empresa?.cicloPago ?? 'Mensual';
     final ahora = DateTime.now();
     _fechaInicio = empresa?.fechaInicioMembresia ?? ahora;
     _fechaFin =
         empresa?.fechaFinMembresia ?? ahora.add(const Duration(days: 30));
-    _activa = empresa?.activa ?? true;
   }
 
   @override
@@ -76,9 +83,11 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
     _nombreContactoController.dispose();
     _telefonoController.dispose();
     _correoController.dispose();
-    _urlController.dispose();
     _montoController.dispose();
     _notasController.dispose();
+    _adminNombreController.dispose();
+    _adminCorreoController.dispose();
+    _adminPasswordController.dispose();
     super.dispose();
   }
 
@@ -138,33 +147,34 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
 
     try {
       final monto = double.tryParse(_montoController.text.trim());
-      final empresa = EmpresaCliente(
+      final empresa = Empresa(
         id: widget.empresa?.id ?? 0,
         nombreEmpresa: _nombreEmpresaController.text.trim(),
         nombreContacto: _nombreContactoController.text.trim(),
         telefonoContacto: _telefonoController.text.trim(),
         correoContacto: _correoController.text.trim(),
-        urlInstalacion: _urlController.text.trim(),
         fechaInicioMembresia: _fechaInicio,
         fechaFinMembresia: _fechaFin,
         montoMembresia: monto,
         cicloPago: _cicloPago,
         notas: _notasController.text.trim(),
-        activa: _activa,
+        activa: widget.empresa?.activa ?? true,
         fechaCreacion: widget.empresa?.fechaCreacion ?? DateTime.now(),
         estadoMembresia: widget.empresa?.estadoMembresia ?? 'Vigente',
         diasParaVencimiento: widget.empresa?.diasParaVencimiento ?? 0,
       );
 
-      final provider = Provider.of<EmpresasClientesProvider>(
-        context,
-        listen: false,
-      );
+      final provider = Provider.of<EmpresasProvider>(context, listen: false);
 
       if (_editando) {
         await provider.actualizarEmpresa(widget.empresa!.id, empresa);
       } else {
-        await provider.agregarEmpresa(empresa);
+        await provider.crearEmpresa(
+          empresa: empresa,
+          adminNombre: _adminNombreController.text.trim(),
+          adminCorreo: _adminCorreoController.text.trim(),
+          adminPassword: _adminPasswordController.text,
+        );
       }
 
       if (!mounted) return;
@@ -196,7 +206,7 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_editando ? 'Editar empresa' : 'Nueva empresa cliente'),
+        title: Text(_editando ? 'Editar empresa' : 'Nueva empresa'),
         elevation: 0,
       ),
       body: SafeArea(
@@ -218,16 +228,6 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
                   validator: (value) => (value == null || value.trim().isEmpty)
                       ? 'Ingresa el nombre de la empresa'
                       : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _urlController,
-                  keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(
-                    labelText: 'URL de su instalación',
-                    hintText: 'https://empresa-api.onrender.com',
-                    prefixIcon: Icon(Icons.link),
-                  ),
                 ),
                 const SizedBox(height: 24),
 
@@ -324,16 +324,6 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
                     prefixIcon: Icon(Icons.attach_money),
                   ),
                 ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Empresa activa'),
-                  subtitle: const Text(
-                    'Desactívala si dejó de ser cliente, sin borrar su historial',
-                  ),
-                  value: _activa,
-                  onChanged: (value) => setState(() => _activa = value),
-                ),
                 const SizedBox(height: 24),
 
                 _buildSectionTitle('Notas de seguimiento'),
@@ -346,6 +336,76 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
                     alignLabelWithHint: true,
                   ),
                 ),
+
+                // Los datos del primer Administrador solo se piden al crear:
+                // el backend crea la empresa y su admin en un solo paso, y
+                // editar una empresa nunca toca a su administrador.
+                if (!_editando) ...[
+                  const SizedBox(height: 24),
+                  _buildSectionTitle('Primer administrador'),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Esta cuenta podrá iniciar sesión de inmediato y crear '
+                    'sus propios operadores.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: LoginovaColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _adminNombreController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre del administrador',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    validator: (value) => (value == null || value.trim().isEmpty)
+                        ? 'Ingresa el nombre del administrador'
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _adminCorreoController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Correo del administrador',
+                      prefixIcon: Icon(Icons.email_outlined),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Ingresa el correo del administrador';
+                      }
+                      if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(value)) {
+                        return 'Ingresa un correo válido';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _adminPasswordController,
+                    obscureText: !_mostrarAdminPassword,
+                    decoration: InputDecoration(
+                      labelText: 'Contraseña inicial',
+                      prefixIcon: const Icon(Icons.lock_outlined),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _mostrarAdminPassword
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                        ),
+                        onPressed: () => setState(
+                          () => _mostrarAdminPassword = !_mostrarAdminPassword,
+                        ),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.length < 8) {
+                        return 'Mínimo 8 caracteres';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
                 const SizedBox(height: 32),
 
                 SizedBox(

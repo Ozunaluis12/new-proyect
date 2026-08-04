@@ -21,6 +21,16 @@ public class Usuario
     [Column("id")]
     public int Id { get; set; }
 
+    /// <summary>
+    /// Empresa (tenant) a la que pertenece este usuario. Null únicamente para
+    /// el rol "Soporte", que administra las empresas mismas y no pertenece a
+    /// ninguna (ver <see cref="Empresa"/> y <c>EmpresasController</c>).
+    /// </summary>
+    [Column("empresa_id")]
+    public int? EmpresaId { get; set; }
+
+    public Empresa? Empresa { get; set; }
+
     [Column("nombre")]
     public string Nombre { get; set; } = "";
 

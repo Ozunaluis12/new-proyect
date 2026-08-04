@@ -2,38 +2,38 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../models/empresa_cliente.dart';
-import '../providers/empresas_clientes_provider.dart';
+import '../models/empresa.dart';
+import '../providers/auth_provider.dart';
+import '../providers/empresas_provider.dart';
 import '../themes/app_theme.dart';
-import '../widgets/menu_drawer.dart';
 import 'crear_editar_empresa_screen.dart';
 
-/// Panel de soporte: CRM interno del vendedor para administrar las empresas
-/// que compraron Loginova (fechas de membresía, contacto, recordatorios).
-/// Exclusivo del rol Administrador; no tiene relación con los clientes de
-/// recogidas de ninguna instalación.
-class EmpresasClientesScreen extends StatefulWidget {
-  const EmpresasClientesScreen({super.key});
+/// Panel de Soporte: administra las empresas (tenants) que compraron
+/// Loginova en este mismo backend compartido — altas (junto con su primer
+/// Administrador), fechas de membresía, recordatorios y
+/// activación/suspensión. Exclusivo del rol Soporte, que no pertenece a
+/// ninguna empresa; por eso esta pantalla no usa el MenuDrawer normal (ese
+/// menú es para usuarios dentro de una empresa) y solo ofrece cerrar sesión.
+class SoportePanelScreen extends StatefulWidget {
+  const SoportePanelScreen({super.key});
 
   @override
-  State<EmpresasClientesScreen> createState() =>
-      _EmpresasClientesScreenState();
+  State<SoportePanelScreen> createState() => _SoportePanelScreenState();
 }
 
-class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
+class _SoportePanelScreenState extends State<SoportePanelScreen> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<EmpresasClientesProvider>(
-        context,
-        listen: false,
-      ).cargarEmpresas();
+      Provider.of<EmpresasProvider>(context, listen: false).cargarEmpresas();
     });
   }
 
   Color _colorEstado(String estado) {
     switch (estado) {
+      case 'Suspendida':
+        return LoginovaColors.textSecondary;
       case 'Vencida':
         return LoginovaColors.error;
       case 'PorVencer':
@@ -45,6 +45,8 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
 
   String _etiquetaEstado(String estado) {
     switch (estado) {
+      case 'Suspendida':
+        return 'Suspendida';
       case 'Vencida':
         return 'Vencida';
       case 'PorVencer':
@@ -63,9 +65,9 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
   /// Abre WhatsApp con un mensaje de recordatorio ya redactado para el
   /// contacto de la empresa. No usa ninguna API de WhatsApp (esto sería
   /// costoso/complejo de mantener): es el link estándar de "click to chat",
-  /// gratis, que abre WhatsApp con el texto precargado para que el vendedor
-  /// lo revise y lo envíe manualmente.
-  Future<void> _recordarPorWhatsapp(EmpresaCliente empresa) async {
+  /// gratis, que abre WhatsApp con el texto precargado para que Soporte lo
+  /// revise y lo envíe manualmente.
+  Future<void> _recordarPorWhatsapp(Empresa empresa) async {
     final telefono = (empresa.telefonoContacto ?? '').replaceAll(
       RegExp(r'[^0-9]'),
       '',
@@ -137,14 +139,14 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
     );
 
     if (marcar == true && mounted) {
-      await Provider.of<EmpresasClientesProvider>(
+      await Provider.of<EmpresasProvider>(
         context,
         listen: false,
       ).marcarRecordatorioEnviado(empresa.id);
     }
   }
 
-  void _abrirFormulario({EmpresaCliente? empresa}) {
+  void _abrirFormulario({Empresa? empresa}) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -153,15 +155,19 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
     );
   }
 
-  Future<void> _confirmarEliminar(EmpresaCliente empresa) async {
+  Future<void> _confirmarCambiarActiva(Empresa empresa) async {
+    final activar = !empresa.activa;
     final confirmado = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Eliminar empresa'),
+        title: Text(activar ? 'Activar empresa' : 'Suspender empresa'),
         content: Text(
-          '¿Eliminar definitivamente "${empresa.nombreEmpresa}"? Esto borra '
-          'también su historial de seguimiento. Si solo dejó de ser cliente, '
-          'mejor edítala y desmárcala como "Activa" en vez de eliminarla.',
+          activar
+              ? '¿Reactivar "${empresa.nombreEmpresa}"? Todos sus usuarios '
+                    'recuperan acceso de inmediato.'
+              : '¿Suspender "${empresa.nombreEmpresa}"? TODOS sus usuarios '
+                    '(administrador, operadores, etc.) pierden acceso de '
+                    'inmediato, sin importar la fecha de vencimiento.',
         ),
         actions: [
           TextButton(
@@ -170,35 +176,55 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: TextButton.styleFrom(foregroundColor: LoginovaColors.error),
-            child: const Text('Eliminar'),
+            style: TextButton.styleFrom(
+              foregroundColor: activar
+                  ? LoginovaColors.success
+                  : LoginovaColors.error,
+            ),
+            child: Text(activar ? 'Activar' : 'Suspender'),
           ),
         ],
       ),
     );
 
-    if (confirmado == true && mounted) {
-      await Provider.of<EmpresasClientesProvider>(
-        context,
-        listen: false,
-      ).eliminarEmpresa(empresa.id);
+    if (confirmado != true || !mounted) return;
+
+    final provider = Provider.of<EmpresasProvider>(context, listen: false);
+    if (activar) {
+      await provider.activarEmpresa(empresa.id);
+    } else {
+      await provider.suspenderEmpresa(empresa.id);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: const MenuDrawer(currentRoute: '/soporte'),
       appBar: AppBar(
         title: const Text('Panel de Soporte'),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Cerrar sesión',
+            onPressed: () async {
+              await Provider.of<AuthProvider>(
+                context,
+                listen: false,
+              ).logout();
+              if (context.mounted) {
+                Navigator.pushReplacementNamed(context, '/');
+              }
+            },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _abrirFormulario(),
         icon: const Icon(Icons.add_business),
         label: const Text('Nueva empresa'),
       ),
-      body: Consumer<EmpresasClientesProvider>(
+      body: Consumer<EmpresasProvider>(
         builder: (context, provider, _) {
           if (provider.cargando) {
             return const Center(child: CircularProgressIndicator());
@@ -214,12 +240,16 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
           final porVencer = provider.empresas
               .where((e) => e.estadoMembresia == 'PorVencer')
               .length;
+          final suspendidas = provider.empresas
+              .where((e) => e.estadoMembresia == 'Suspendida')
+              .length;
 
           return RefreshIndicator(
             onRefresh: provider.cargarEmpresas,
             child: Column(
               children: [
-                if (vencidas > 0 || porVencer > 0) _buildResumen(vencidas, porVencer),
+                if (vencidas > 0 || porVencer > 0 || suspendidas > 0)
+                  _buildResumen(vencidas, porVencer, suspendidas),
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.all(12),
@@ -236,7 +266,7 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
     );
   }
 
-  Widget _buildResumen(int vencidas, int porVencer) {
+  Widget _buildResumen(int vencidas, int porVencer, int suspendidas) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -258,10 +288,21 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
                 color: Colors.white,
                 size: 18,
               ),
-              label: Text(
-                '$porVencer por vencer (7 días)',
-              ),
+              label: Text('$porVencer por vencer (7 días)'),
               backgroundColor: LoginovaColors.warning,
+              labelStyle: const TextStyle(color: Colors.white),
+            ),
+          if (suspendidas > 0)
+            Chip(
+              avatar: const Icon(
+                Icons.pause_circle_outline,
+                color: Colors.white,
+                size: 18,
+              ),
+              label: Text(
+                '$suspendidas suspendida${suspendidas == 1 ? '' : 's'}',
+              ),
+              backgroundColor: LoginovaColors.textSecondary,
               labelStyle: const TextStyle(color: Colors.white),
             ),
         ],
@@ -269,12 +310,14 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
     );
   }
 
-  Widget _buildEmpresaCard(EmpresaCliente empresa) {
+  Widget _buildEmpresaCard(Empresa empresa) {
     final color = _colorEstado(empresa.estadoMembresia);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      color: empresa.estadoMembresia == 'Vencida'
+      color: empresa.estadoMembresia == 'Suspendida'
+          ? LoginovaColors.textSecondary.withValues(alpha: 0.08)
+          : empresa.estadoMembresia == 'Vencida'
           ? LoginovaColors.error.withValues(alpha: 0.08)
           : empresa.estadoMembresia == 'PorVencer'
           ? LoginovaColors.warning.withValues(alpha: 0.08)
@@ -315,15 +358,6 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
                       ),
                     ),
                   ),
-                  if (!empresa.activa)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 6),
-                      child: Icon(
-                        Icons.pause_circle_outline,
-                        size: 18,
-                        color: LoginovaColors.textSecondary,
-                      ),
-                    ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -371,11 +405,20 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
                     icon: const Icon(Icons.edit_outlined, size: 18),
                     label: const Text('Editar'),
                   ),
-                  IconButton(
-                    onPressed: () => _confirmarEliminar(empresa),
-                    icon: const Icon(Icons.delete_outline),
-                    color: LoginovaColors.error,
-                    tooltip: 'Eliminar',
+                  TextButton.icon(
+                    onPressed: () => _confirmarCambiarActiva(empresa),
+                    icon: Icon(
+                      empresa.activa
+                          ? Icons.pause_circle_outline
+                          : Icons.play_circle_outline,
+                      size: 18,
+                    ),
+                    label: Text(empresa.activa ? 'Suspender' : 'Activar'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: empresa.activa
+                          ? LoginovaColors.error
+                          : LoginovaColors.success,
+                    ),
                   ),
                 ],
               ),
@@ -400,11 +443,11 @@ class _EmpresasClientesScreenState extends State<EmpresasClientesScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Todavía no registraste ninguna empresa cliente',
+              'Todavía no registraste ninguna empresa',
               textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: LoginovaColors.textSecondary),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: LoginovaColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(

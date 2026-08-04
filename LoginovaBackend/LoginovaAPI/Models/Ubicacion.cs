@@ -6,11 +6,15 @@ namespace LoginovaAPI.Models;
 /// Modelo que representa una ubicacion geografica de un usuario (operador).
 /// </summary>
 [Table("ubicaciones")]
-public class Ubicacion
+public class Ubicacion : ITenantOwned
 {
     /// <summary>Identificador unico del registro de ubicacion.</summary>
     [Column("id")]
     public int Id { get; set; }
+
+    /// <summary>Empresa (tenant) a la que pertenece esta ubicacion. Ver <see cref="ITenantOwned"/>.</summary>
+    [Column("empresa_id")]
+    public int EmpresaId { get; set; }
 
     /// <summary>Identificador del usuario (operador) que registra la ubicacion.</summary>
     [Column("usuario_id")]

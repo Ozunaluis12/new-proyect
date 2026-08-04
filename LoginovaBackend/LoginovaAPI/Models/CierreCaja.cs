@@ -10,10 +10,14 @@ namespace LoginovaAPI.Models;
 /// nocturno recogiendo lo que haya quedado pendiente después.
 /// </summary>
 [Table("cierres_caja")]
-public class CierreCaja
+public class CierreCaja : ITenantOwned
 {
     [Column("id")]
     public int Id { get; set; }
+
+    /// <summary>Empresa (tenant) a la que pertenece este cierre. Ver <see cref="ITenantOwned"/>.</summary>
+    [Column("empresa_id")]
+    public int EmpresaId { get; set; }
 
     /// <summary>Operador al que pertenecen los ingresos incluidos en este cierre.</summary>
     [Column("operador_id")]

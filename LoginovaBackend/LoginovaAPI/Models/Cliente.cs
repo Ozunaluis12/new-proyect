@@ -6,11 +6,15 @@ namespace LoginovaAPI.Models;
 /// Modelo que representa un cliente en el sistema de recogidas.
 /// </summary>
 [Table("clientes")]
-public class Cliente
+public class Cliente : ITenantOwned
 {
     /// <summary>Identificador unico del cliente.</summary>
     [Column("id")]
     public int Id { get; set; }
+
+    /// <summary>Empresa (tenant) a la que pertenece este cliente. Ver <see cref="ITenantOwned"/>.</summary>
+    [Column("empresa_id")]
+    public int EmpresaId { get; set; }
 
     /// <summary>Nombre completo del cliente.</summary>
     [Column("nombre")]

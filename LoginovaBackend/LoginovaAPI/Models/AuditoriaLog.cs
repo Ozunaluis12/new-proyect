@@ -15,6 +15,15 @@ public class AuditoriaLog
     public int Id { get; set; }
 
     /// <summary>
+    /// Empresa (tenant) a la que pertenece este registro. Nullable (no
+    /// implementa <see cref="ITenantOwned"/>, igual que <see cref="Usuario"/>)
+    /// porque las acciones de Soporte (crear/activar/suspender empresas) no
+    /// pertenecen a ninguna empresa y aun así deben poder auditarse.
+    /// </summary>
+    [Column("empresa_id")]
+    public int? EmpresaId { get; set; }
+
+    /// <summary>
     /// ID del usuario que realizó el cambio.
     /// </summary>
     [Column("usuario_id")]

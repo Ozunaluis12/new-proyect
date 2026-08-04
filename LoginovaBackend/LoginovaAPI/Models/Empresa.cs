@@ -3,15 +3,16 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace LoginovaAPI.Models;
 
 /// <summary>
-/// Representa una empresa que compró Loginova (no un cliente de recogidas:
-/// esto es el CRM interno del vendedor para llevar control de a quién se le
-/// vendió, con qué instalación cuenta y cuándo vence su membresía). Cada
-/// empresa cliente corre su propia instalación independiente de Loginova
-/// (modelo "una instalación por cliente"); este registro vive únicamente en
-/// la instalación del vendedor, nunca en la de sus clientes.
+/// Una empresa cliente dentro del sistema multi-tenant: todos los datos de
+/// negocio (usuarios, clientes de recogidas, recogidas, ingresos, etc.)
+/// pertenecen a exactamente una Empresa, aislados de las demás por los
+/// filtros de consulta globales configurados en
+/// <see cref="Data.AppDbContext.OnModelCreating"/>. El rol "Soporte" (que no
+/// pertenece a ninguna empresa) es quien crea, activa y suspende empresas
+/// desde <c>EmpresasController</c>.
 /// </summary>
-[Table("empresas_clientes")]
-public class EmpresaCliente
+[Table("empresas")]
+public class Empresa
 {
     [Column("id")]
     public int Id { get; set; }
@@ -29,10 +30,6 @@ public class EmpresaCliente
     [Column("correo_contacto")]
     public string? CorreoContacto { get; set; }
 
-    /// <summary>URL base de la instalación de Loginova de esta empresa (su propio backend).</summary>
-    [Column("url_instalacion")]
-    public string? UrlInstalacion { get; set; }
-
     [Column("fecha_inicio_membresia")]
     public DateTime FechaInicioMembresia { get; set; }
 
@@ -47,11 +44,16 @@ public class EmpresaCliente
     [Column("ciclo_pago")]
     public string? CicloPago { get; set; }
 
-    /// <summary>Notas de seguimiento del vendedor/soporte (no visibles para la empresa cliente).</summary>
+    /// <summary>Notas de seguimiento de Soporte (no visibles para la empresa).</summary>
     [Column("notas")]
     public string? Notas { get; set; }
 
-    /// <summary>Falso cuando se da de baja definitiva a la empresa (no se elimina, para no perder el historial).</summary>
+    /// <summary>
+    /// Si es falso, ningún usuario de esta empresa (admin, operadores, etc.)
+    /// puede usar el sistema: el middleware de vigencia de membresía
+    /// responde 402 en cada request. Soporte controla este campo desde
+    /// "Activar"/"Suspender" en el Panel de Soporte.
+    /// </summary>
     [Column("activa")]
     public bool Activa { get; set; } = true;
 
@@ -61,4 +63,6 @@ public class EmpresaCliente
 
     [Column("fecha_creacion")]
     public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
+
+    public List<Usuario> Usuarios { get; set; } = [];
 }

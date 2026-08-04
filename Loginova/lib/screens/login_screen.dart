@@ -41,10 +41,17 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (exito) {
-      // Los administradores van a su propio dashboard (/admin); el resto de
-      // roles (subadmin, operador, cliente) usa el home general.
-      final isAdmin = auth.usuario?.rol.toLowerCase() == 'administrador';
-      Navigator.pushReplacementNamed(context, isAdmin ? '/admin' : '/home');
+      // Soporte (no pertenece a ninguna empresa) va directo a su panel de
+      // empresas; los administradores de una empresa van a su propio
+      // dashboard (/admin); el resto de roles (subadmin, operador, cliente)
+      // usa el home general.
+      final rol = auth.usuario?.rol.toLowerCase();
+      final destino = rol == 'soporte'
+          ? '/soporte'
+          : rol == 'administrador'
+          ? '/admin'
+          : '/home';
+      Navigator.pushReplacementNamed(context, destino);
       return;
     }
 
@@ -348,7 +355,8 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Construye los links adicionales (olvidé contraseña, registrarse)
+  /// Construye los links adicionales (olvidé contraseña). No hay registro
+  /// público: toda cuenta nueva la crea un Administrador o Soporte.
   Widget _buildAdditionalLinks() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -357,12 +365,6 @@ class _LoginScreenState extends State<LoginScreen> {
           onPressed: () => Navigator.pushNamed(context, '/forgot'),
           icon: const Icon(Icons.help_outline),
           label: const Text('¿Olvidaste tu contraseña?'),
-        ),
-        const Text('•', style: TextStyle(color: LoginovaColors.textSecondary)),
-        TextButton.icon(
-          onPressed: () => Navigator.pushNamed(context, '/register'),
-          icon: const Icon(Icons.person_add_outlined),
-          label: const Text('Registrarse'),
         ),
       ],
     );

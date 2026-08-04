@@ -6,11 +6,15 @@ namespace LoginovaAPI.Models;
 /// Modelo que mantiene un registro historico de cambios de estado en las recogidas.
 /// </summary>
 [Table("historial_estados")]
-public class HistorialEstado
+public class HistorialEstado : ITenantOwned
 {
     /// <summary>Identificador unico del registro historico.</summary>
     [Column("id")]
     public int Id { get; set; }
+
+    /// <summary>Empresa (tenant) a la que pertenece este registro. Ver <see cref="ITenantOwned"/>.</summary>
+    [Column("empresa_id")]
+    public int EmpresaId { get; set; }
 
     /// <summary>Identificador de la recogida cuyo estado cambio.</summary>
     [Column("recogida_id")]
