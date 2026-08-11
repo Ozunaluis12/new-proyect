@@ -146,6 +146,8 @@ class DashboardView extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               nombre,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 24,
@@ -175,42 +177,53 @@ class DashboardView extends StatelessWidget {
             .where((r) => r.estado.toLowerCase() == 'recogida')
             .length;
 
-        return GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          children: [
-            _buildStatCard(
-              context,
-              'Total Recogidas',
-              totalRecogidas.toString(),
-              Icons.local_shipping,
-              LoginovaColors.primary,
-            ),
-            _buildStatCard(
-              context,
-              'Pendientes',
-              pendientes.toString(),
-              Icons.hourglass_empty,
-              LoginovaColors.warning,
-            ),
-            _buildStatCard(
-              context,
-              'Completadas',
-              completadas.toString(),
-              Icons.check_circle,
-              LoginovaColors.success,
-            ),
-            _buildStatCard(
-              context,
-              'En Progreso',
-              (totalRecogidas - pendientes - completadas).toString(),
-              Icons.autorenew,
-              LoginovaColors.info,
-            ),
-          ],
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final crossAxisCount = constraints.maxWidth >= 900
+                ? 4
+                : constraints.maxWidth >= 600
+                ? 3
+                : 2;
+
+            return GridView.count(
+              crossAxisCount: crossAxisCount,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: crossAxisCount >= 4 ? 1.3 : 1.5,
+              children: [
+                _buildStatCard(
+                  context,
+                  'Total Recogidas',
+                  totalRecogidas.toString(),
+                  Icons.local_shipping,
+                  LoginovaColors.primary,
+                ),
+                _buildStatCard(
+                  context,
+                  'Pendientes',
+                  pendientes.toString(),
+                  Icons.hourglass_empty,
+                  LoginovaColors.warning,
+                ),
+                _buildStatCard(
+                  context,
+                  'Completadas',
+                  completadas.toString(),
+                  Icons.check_circle,
+                  LoginovaColors.success,
+                ),
+                _buildStatCard(
+                  context,
+                  'En Progreso',
+                  (totalRecogidas - pendientes - completadas).toString(),
+                  Icons.autorenew,
+                  LoginovaColors.info,
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -246,11 +259,11 @@ class DashboardView extends StatelessWidget {
             ),
             Text(
               value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(color: color),
             ),
             Text(
               label,

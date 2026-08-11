@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../themes/app_theme.dart';
 import '../widgets/menu_drawer.dart';
+import '../widgets/responsive_center.dart';
 
 /// Pantalla donde un usuario YA autenticado cambia su propia contraseña.
 /// Reutiliza el mismo flujo de dos pasos (código por correo + nueva
@@ -140,7 +141,8 @@ class _SeguridadScreenState extends State<SeguridadScreen> {
           return SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: Form(
+              child: ResponsiveCenter(
+                child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -282,6 +284,7 @@ class _SeguridadScreenState extends State<SeguridadScreen> {
                     ),
                     ],
                   ],
+                ),
                 ),
               ),
             ),

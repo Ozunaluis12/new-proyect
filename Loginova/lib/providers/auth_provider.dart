@@ -45,7 +45,17 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    final result = await _authService.login(correo, password);
+    AuthResult? result;
+    try {
+      result = await _authService.login(correo, password);
+    } on AuthException catch (e) {
+      _cargando = false;
+      _logueado = false;
+      _usuario = null;
+      _error = e.mensaje;
+      notifyListeners();
+      return false;
+    }
     _cargando = false;
 
     if (result == null) {

@@ -365,12 +365,15 @@ class _MapaScreenState extends State<MapaScreen> {
             children: [
               // Encabezado
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Recogida #${recogida.id}',
-                    style: Theme.of(context).textTheme.headlineSmall,
+                  Expanded(
+                    child: Text(
+                      'Recogida #${recogida.id}',
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -384,10 +387,9 @@ class _MapaScreenState extends State<MapaScreen> {
                     ),
                     child: Text(
                       recogida.estado,
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: _getColorPorEstado(recogida.estado),
                         fontWeight: FontWeight.bold,
-                        fontSize: 12,
                       ),
                     ),
                   ),
@@ -471,13 +473,15 @@ class _MapaScreenState extends State<MapaScreen> {
         children: [
           Text(
             '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           Expanded(
             child: Text(
               value,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12),
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
         ],

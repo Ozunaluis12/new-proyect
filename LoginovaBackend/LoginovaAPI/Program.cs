@@ -201,20 +201,48 @@ app.UseCors("LoginovaCors");
 app.UseRateLimiter();
 app.UseAuthentication();
 
-// Vigencia de membresía por empresa (multi-tenant): si la empresa del
-// usuario autenticado está suspendida (Soporte) o su membresía ya venció,
-// se bloquea toda la API con un mensaje claro en vez de dejar que falle de
-// forma confusa en cada endpoint. /health queda exento para que el
-// monitoreo de infraestructura siga viendo el servicio como "arriba", y el
-// rol Soporte (sin claim empresaId) nunca lo dispara.
+// Vigencia de membresía por empresa (multi-tenant) y de la cuenta
+// individual: si la empresa del usuario autenticado está suspendida
+// (Soporte) o su membresía ya venció, o si a ese usuario puntual lo
+// desactivaron, se bloquea toda la API con un mensaje claro en vez de dejar
+// que falle de forma confusa en cada endpoint. Se revisa en cada request
+// (no solo al hacer login) para que una desactivación/suspensión tenga
+// efecto inmediato y no haya que esperar a que expire el JWT (hasta 8h).
+// /health queda exento para que el monitoreo de infraestructura siga
+// viendo el servicio como "arriba".
 app.Use(async (context, next) =>
 {
     if (context.Request.Path != "/health" && context.User.Identity?.IsAuthenticated == true)
     {
+        var dbContext = context.RequestServices.GetRequiredService<AppDbContext>();
+
+        var userIdClaim = context.User.FindFirst("userId")?.Value;
+        if (int.TryParse(userIdClaim, out var userId))
+        {
+            // IgnoreQueryFilters: es la única consulta de este middleware que
+            // no depende de empresaId (se busca al propio usuario por su Id),
+            // así que el filtro de tenant no debe interferir.
+            var activo = await dbContext.Usuarios
+                .IgnoreQueryFilters()
+                .Where(u => u.Id == userId)
+                .Select(u => (bool?)u.Activo)
+                .FirstOrDefaultAsync();
+
+            if (activo != true)
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    mensaje = "Tu cuenta fue desactivada. Contacta a tu administrador o a soporte.",
+                });
+                return;
+            }
+        }
+
         var empresaIdClaim = context.User.FindFirst("empresaId")?.Value;
         if (int.TryParse(empresaIdClaim, out var empresaId))
         {
-            var dbContext = context.RequestServices.GetRequiredService<AppDbContext>();
             var empresa = await dbContext.Empresas
                 .AsNoTracking()
                 .FirstOrDefaultAsync(e => e.Id == empresaId);

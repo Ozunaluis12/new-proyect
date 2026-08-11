@@ -212,49 +212,65 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     int pendientes,
     double ingresos,
   ) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      children: [
-        _buildMetricCard(
-          context,
-          'Total',
-          total.toString(),
-          Icons.local_shipping,
-          LoginovaColors.primary,
-        ),
-        _buildMetricCard(
-          context,
-          'Completadas',
-          completadas.toString(),
-          Icons.check_circle,
-          LoginovaColors.success,
-        ),
-        _buildMetricCard(
-          context,
-          'En Ruta',
-          enRuta.toString(),
-          Icons.directions_car,
-          LoginovaColors.secondary,
-        ),
-        _buildMetricCard(
-          context,
-          'Pendientes',
-          pendientes.toString(),
-          Icons.hourglass_empty,
-          LoginovaColors.warning,
-        ),
-        _buildMetricCard(
-          context,
-          'Ingresos',
-          '\$${ingresos.toStringAsFixed(2)}',
-          Icons.payments,
-          LoginovaColors.success,
-        ),
-      ],
+    // crossAxisCount según ancho disponible en vez de fijo en 2: en una
+    // ventana de escritorio ancha, 2 columnas dejaban las tarjetas
+    // estiradas con mucho espacio vacío; en un celular angosto, más de 2
+    // columnas apretaría demasiado el texto.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final crossAxisCount = width >= 900
+            ? 5
+            : width >= 700
+            ? 3
+            : 2;
+
+        return GridView.count(
+          crossAxisCount: crossAxisCount,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: crossAxisCount >= 5 ? 1.3 : 1.6,
+          children: [
+            _buildMetricCard(
+              context,
+              'Total',
+              total.toString(),
+              Icons.local_shipping,
+              LoginovaColors.primary,
+            ),
+            _buildMetricCard(
+              context,
+              'Completadas',
+              completadas.toString(),
+              Icons.check_circle,
+              LoginovaColors.success,
+            ),
+            _buildMetricCard(
+              context,
+              'En Ruta',
+              enRuta.toString(),
+              Icons.directions_car,
+              LoginovaColors.secondary,
+            ),
+            _buildMetricCard(
+              context,
+              'Pendientes',
+              pendientes.toString(),
+              Icons.hourglass_empty,
+              LoginovaColors.warning,
+            ),
+            _buildMetricCard(
+              context,
+              'Ingresos',
+              '\$${ingresos.toStringAsFixed(2)}',
+              Icons.payments,
+              LoginovaColors.success,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -291,13 +307,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 Text(
                   value,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(color: color),
                 ),
-                Text(label, style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ],
             ),
           ],
@@ -339,9 +359,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   /// Fila de recurso
   Widget _buildRecursoRow(String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+        Expanded(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ),
+        const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(

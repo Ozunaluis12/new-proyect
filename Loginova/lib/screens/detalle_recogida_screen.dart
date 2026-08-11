@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../themes/app_theme.dart';
 import '../widgets/llamar_cliente_button.dart';
+import '../widgets/responsive_center.dart';
 import 'cambiar_estado_recogida_screen.dart';
 import 'editar_recogida_screen.dart';
 import 'evidencia_screen.dart';
@@ -149,7 +150,8 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          child: Column(
+          child: ResponsiveCenter(
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Estado actual
@@ -230,6 +232,7 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
               // Botones de acción
               _buildActionButtons(),
             ],
+            ),
           ),
         ),
       ),
@@ -366,22 +369,34 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
     );
   }
 
-  /// Construye una fila de información
+  /// Construye una fila de información. Label y valor van en Expanded (con
+  /// flex distinto) para que un valor largo (p. ej. una fecha con hora) se
+  /// recorte con "..." en vez de desbordar la fila en pantallas angostas.
   Widget _buildInfoRow(String label, String value, {Color? valueColor}) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: LoginovaColors.textSecondary),
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: LoginovaColors.textSecondary),
+          ),
         ),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: valueColor,
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 3,
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: valueColor,
+            ),
           ),
         ),
       ],
@@ -410,10 +425,13 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
               children: [
                 Icon(icon, color: color, size: 20),
                 const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: LoginovaColors.textSecondary,
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: LoginovaColors.textSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -421,9 +439,9 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
             const SizedBox(height: 6),
             Text(
               value,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: color,
               ),
             ),
@@ -559,8 +577,12 @@ class _DetalleRecogidaScreenState extends State<DetalleRecogidaScreen> {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+      // maxCrossAxisExtent en vez de un crossAxisCount fijo: en un celular
+      // angosto caben 2 columnas, pero en una ventana de escritorio ancha
+      // se aprovecha el espacio con más columnas en vez de dejar 2 fotos
+      // gigantes con espacio vacío a los lados.
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 180,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
         childAspectRatio: 1,

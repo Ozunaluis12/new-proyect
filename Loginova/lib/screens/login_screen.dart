@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../themes/app_theme.dart';
+import '../widgets/responsive_center.dart';
 
 /// Pantalla profesional de inicio de sesión con validaciones y diseño moderno.
 class LoginScreen extends StatefulWidget {
@@ -170,21 +171,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: SizedBox(
                   height: size.height - 40,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Logo y Título
-                      _buildHeader(),
-                      SizedBox(height: isMobile ? 40 : 50),
+                  child: ResponsiveCenter(
+                    maxWidth: 420,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Logo y Título
+                        _buildHeader(),
+                        SizedBox(height: isMobile ? 40 : 50),
 
-                      // Formulario
-                      _buildLoginForm(),
+                        // Formulario
+                        _buildLoginForm(),
 
-                      SizedBox(height: isMobile ? 30 : 40),
+                        SizedBox(height: isMobile ? 30 : 40),
 
-                      // Links adicionales
-                      _buildAdditionalLinks(),
-                    ],
+                        // Links adicionales
+                        _buildAdditionalLinks(),
+                      ],
+                    ),
                   ),
                 ),
               ),

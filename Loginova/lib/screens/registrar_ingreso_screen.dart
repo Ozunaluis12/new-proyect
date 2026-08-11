@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../widgets/responsive_center.dart';
+
 /// Resultado que [RegistrarIngresoScreen] devuelve por Navigator.pop cuando
 /// el operador confirma el cobro: monto recibido, forma de pago (efectivo o
 /// transferencia) y foto de evidencia opcional. La pantalla que la abre
@@ -105,7 +107,8 @@ class _RegistrarIngresoScreenState extends State<RegistrarIngresoScreen> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Form(
+          child: ResponsiveCenter(
+            child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -166,6 +169,7 @@ class _RegistrarIngresoScreenState extends State<RegistrarIngresoScreen> {
                   child: const Text('Guardar ingreso'),
                 ),
               ],
+            ),
             ),
           ),
         ),

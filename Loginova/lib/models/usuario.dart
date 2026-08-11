@@ -5,6 +5,7 @@ class Usuario {
   final String correo;
   final String rol;
   final List<String> permisos;
+  final bool activo;
 
   /// Constructor que requiere todos los campos.
   Usuario({
@@ -13,6 +14,7 @@ class Usuario {
     required this.correo,
     required this.rol,
     required this.permisos,
+    this.activo = true,
   });
 
   /// Crea una instancia de Usuario desde un JSON devuelto por el servidor.
@@ -23,6 +25,9 @@ class Usuario {
       correo: json['correo'],
       rol: json['rol'] ?? '',
       permisos: List<String>.from(json['permisos'] ?? const []),
+      // Default true: sesiones guardadas antes de que este campo existiera
+      // no lo tendrán en su JSON local, y no deben tratarse como inactivas.
+      activo: json['activo'] ?? true,
     );
   }
 
@@ -34,6 +39,7 @@ class Usuario {
       'correo': correo,
       'rol': rol,
       'permisos': permisos,
+      'activo': activo,
     };
   }
 

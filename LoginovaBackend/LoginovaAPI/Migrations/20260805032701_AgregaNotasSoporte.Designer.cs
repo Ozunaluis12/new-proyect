@@ -3,6 +3,7 @@ using System;
 using LoginovaAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LoginovaAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260805032701_AgregaNotasSoporte")]
+    partial class AgregaNotasSoporte
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -195,38 +198,6 @@ namespace LoginovaAPI.Migrations
                     b.HasIndex("EmpresaId");
 
                     b.ToTable("clientes", (string)null);
-                });
-
-            modelBuilder.Entity("LoginovaAPI.Models.ConfiguracionSoporte", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("PlantillaRecordatorioVencida")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("plantilla_recordatorio_vencida");
-
-                    b.Property<string>("PlantillaRecordatorioVigente")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("plantilla_recordatorio_vigente");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("configuracion_soporte", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            PlantillaRecordatorioVencida = "Hola {contacto}, te escribimos de Loginova: la membresía de {empresa} venció el {fecha}. ¿Deseas renovarla para seguir usando el sistema sin interrupciones?",
-                            PlantillaRecordatorioVigente = "Hola {contacto}, te escribimos de Loginova: la membresía de {empresa} vence el {fecha}. ¿Deseas que gestionemos la renovación?"
-                        });
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.Empresa", b =>
@@ -546,55 +517,6 @@ namespace LoginovaAPI.Migrations
                     b.HasIndex("UsuarioId");
 
                     b.ToTable("notificaciones");
-                });
-
-            modelBuilder.Entity("LoginovaAPI.Models.PagoMembresia", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("CicloPago")
-                        .HasColumnType("text")
-                        .HasColumnName("ciclo_pago");
-
-                    b.Property<int>("EmpresaId")
-                        .HasColumnType("integer")
-                        .HasColumnName("empresa_id");
-
-                    b.Property<DateTime>("FechaPago")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("fecha_pago");
-
-                    b.Property<decimal>("Monto")
-                        .HasColumnType("numeric")
-                        .HasColumnName("monto");
-
-                    b.Property<string>("Notas")
-                        .HasColumnType("text")
-                        .HasColumnName("notas");
-
-                    b.Property<DateTime?>("PeriodoDesde")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("periodo_desde");
-
-                    b.Property<DateTime?>("PeriodoHasta")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("periodo_hasta");
-
-                    b.Property<string>("RegistradoPorNombre")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("registrado_por_nombre");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmpresaId");
-
-                    b.ToTable("pagos_membresia", (string)null);
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.PasswordResetToken", b =>
@@ -1145,15 +1067,6 @@ namespace LoginovaAPI.Migrations
                         .IsRequired();
 
                     b.Navigation("Usuario");
-                });
-
-            modelBuilder.Entity("LoginovaAPI.Models.PagoMembresia", b =>
-                {
-                    b.HasOne("LoginovaAPI.Models.Empresa", null)
-                        .WithMany()
-                        .HasForeignKey("EmpresaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("LoginovaAPI.Models.PasswordResetToken", b =>

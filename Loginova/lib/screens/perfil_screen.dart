@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../themes/app_theme.dart';
 import '../widgets/menu_drawer.dart';
+import '../widgets/responsive_center.dart';
 
 /// Pantalla profesional que muestra y gestiona el perfil del usuario autenticado.
 class PerfilScreen extends StatelessWidget {
@@ -49,11 +50,12 @@ class PerfilScreen extends StatelessWidget {
           : SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Tarjeta de perfil con avatar
-                    _buildProfileCard(usuario),
+                child: ResponsiveCenter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Tarjeta de perfil con avatar
+                      _buildProfileCard(usuario),
                     const SizedBox(height: 32),
 
                     // Sección de información
@@ -71,6 +73,7 @@ class PerfilScreen extends StatelessWidget {
                     // Botón de cerrar sesión
                     _buildLogoutButton(context),
                   ],
+                  ),
                 ),
               ),
             ),

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/cierre_caja.dart';
 import '../providers/ingresos_provider.dart';
 import '../themes/app_theme.dart';
+import '../widgets/responsive_center.dart';
 
 /// Pantalla para que el administrador cierre la caja de un operador o
 /// subadministrador: elige a quién, ve cuánto tiene pendiente (desglosado
@@ -140,7 +141,8 @@ class _CerrarCajaScreenState extends State<CerrarCajaScreen> {
           ? const Center(child: Text('No hay operadores ni subadministradores registrados.'))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: Column(
+              child: ResponsiveCenter(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   DropdownButtonFormField<int>(
@@ -178,6 +180,7 @@ class _CerrarCajaScreenState extends State<CerrarCajaScreen> {
                   else if (_resumen != null)
                     _buildResumen(_resumen!),
                 ],
+                ),
               ),
             ),
     );

@@ -45,7 +45,8 @@ public class UsuariosController : ControllerBase
                 usuario.Nombre,
                 usuario.Correo,
                 usuario.Rol,
-                usuario.Permisos))
+                usuario.Permisos,
+                usuario.Activo))
             .ToListAsync();
 
         return Ok(usuarios);
@@ -225,6 +226,6 @@ public class UsuariosController : ControllerBase
 
     private static UsuarioResponse ToResponse(Usuario usuario)
     {
-        return new UsuarioResponse(usuario.Id, usuario.Nombre, usuario.Correo, usuario.Rol, usuario.Permisos);
+        return new UsuarioResponse(usuario.Id, usuario.Nombre, usuario.Correo, usuario.Rol, usuario.Permisos, usuario.Activo);
     }
 }

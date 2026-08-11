@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/empresa.dart';
 import '../providers/empresas_provider.dart';
 import '../themes/app_theme.dart';
+import '../widgets/responsive_center.dart';
 
 /// Formulario del Panel de Soporte para registrar o editar una empresa
 /// (tenant). Al crear, pide además los datos de su primer Administrador
@@ -212,12 +213,13 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionTitle('Datos de la empresa'),
+          child: ResponsiveCenter(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionTitle('Datos de la empresa'),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _nombreEmpresaController,
@@ -428,6 +430,7 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
                   ),
                 ),
               ],
+              ),
             ),
           ),
         ),

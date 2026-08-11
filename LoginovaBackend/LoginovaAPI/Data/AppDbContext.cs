@@ -65,6 +65,15 @@ public class AppDbContext : DbContext
     public DbSet<Empresa> Empresas =>
         Set<Empresa>();
 
+    public DbSet<NotaSoporte> NotasSoporte =>
+        Set<NotaSoporte>();
+
+    public DbSet<PagoMembresia> PagosMembresia =>
+        Set<PagoMembresia>();
+
+    public DbSet<ConfiguracionSoporte> ConfiguracionSoporte =>
+        Set<ConfiguracionSoporte>();
+
     /// <summary>
     /// Configura el mapeo de entidades a tablas (nombres en snake_case),
     /// relaciones/claves foráneas y sus reglas de borrado, índices para las
@@ -85,6 +94,21 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Ingreso>().ToTable("ingresos");
         modelBuilder.Entity<Evidencia>().ToTable("evidencias");
         modelBuilder.Entity<Empresa>().ToTable("empresas");
+        modelBuilder.Entity<NotaSoporte>().ToTable("notas_soporte");
+        modelBuilder.Entity<PagoMembresia>().ToTable("pagos_membresia");
+        modelBuilder.Entity<ConfiguracionSoporte>().ToTable("configuracion_soporte");
+
+        // Configuración global de Soporte: fila única sembrada con las
+        // plantillas por defecto (los mismos textos que ya usaba
+        // soporte_panel_screen.dart antes de ser editables).
+        modelBuilder.Entity<ConfiguracionSoporte>().HasData(new ConfiguracionSoporte
+        {
+            Id = 1,
+            PlantillaRecordatorioVigente =
+                "Hola {contacto}, te escribimos de Loginova: la membresía de {empresa} vence el {fecha}. ¿Deseas que gestionemos la renovación?",
+            PlantillaRecordatorioVencida =
+                "Hola {contacto}, te escribimos de Loginova: la membresía de {empresa} venció el {fecha}. ¿Deseas renovarla para seguir usando el sistema sin interrupciones?",
+        });
 
         // Correo único global (no por empresa): el login busca por correo
         // sin saber todavía a qué empresa pertenece el usuario (ver
@@ -272,6 +296,8 @@ public class AppDbContext : DbContext
         ConfigurarPropiedadDeEmpresa<CierreCaja>(modelBuilder);
         ConfigurarPropiedadDeEmpresa<Ubicacion>(modelBuilder);
         ConfigurarPropiedadDeEmpresa<Notificacion>(modelBuilder);
+        ConfigurarPropiedadDeEmpresa<NotaSoporte>(modelBuilder);
+        ConfigurarPropiedadDeEmpresa<PagoMembresia>(modelBuilder);
 
         // AuditoriaLog no implementa ITenantOwned (EmpresaId es nullable, igual
         // que Usuario): las acciones de Soporte no pertenecen a ninguna empresa
@@ -297,6 +323,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<CierreCaja>().HasQueryFilter(e => e.EmpresaId == _tenant.EmpresaId);
         modelBuilder.Entity<Ubicacion>().HasQueryFilter(e => e.EmpresaId == _tenant.EmpresaId);
         modelBuilder.Entity<Notificacion>().HasQueryFilter(e => e.EmpresaId == _tenant.EmpresaId);
+        modelBuilder.Entity<NotaSoporte>().HasQueryFilter(e => e.EmpresaId == _tenant.EmpresaId);
+        modelBuilder.Entity<PagoMembresia>().HasQueryFilter(e => e.EmpresaId == _tenant.EmpresaId);
         modelBuilder.Entity<AuditoriaLog>().HasQueryFilter(e => e.EmpresaId == _tenant.EmpresaId);
         // Usuario es un caso especial: EmpresaId es nullable (null = Soporte).
         // Un usuario Soporte no debe ver usuarios de ninguna empresa por esta

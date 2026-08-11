@@ -11,7 +11,8 @@ public record UsuarioResponse(
     string Nombre,
     string Correo,
     string Rol,
-    List<string> Permisos);
+    List<string> Permisos,
+    bool Activo = true);
 
 /// <summary>
 /// Datos para crear un usuario. Password llega en claro (se hashea antes de

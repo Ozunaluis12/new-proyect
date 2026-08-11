@@ -16,6 +16,7 @@ import '../services/geocoding_service.dart';
 import '../services/location_service.dart';
 import '../themes/app_theme.dart';
 import '../utils/app_logger.dart';
+import '../widgets/responsive_center.dart';
 
 /// Pantalla profesional para crear una nueva recogida con selección de ubicación
 class CrearRecogidaScreen extends StatefulWidget {
@@ -359,7 +360,8 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          child: Form(
+          child: ResponsiveCenter(
+            child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,6 +388,7 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
                 _buildActionButtons(),
                 const SizedBox(height: 16),
               ],
+            ),
             ),
           ),
         ),

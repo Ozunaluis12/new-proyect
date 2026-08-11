@@ -419,9 +419,13 @@ class _RecogidasScreenState extends State<RecogidasScreen> {
                 const SizedBox(height: 12),
               ],
 
-              // Botones de acciones
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              // Botones de acciones. Wrap en vez de Row: hasta 3 botones con
+              // icono+texto no siempre caben en una sola línea en un
+              // celular angosto; con Wrap pasan a una segunda línea en vez
+              // de desbordar la tarjeta.
+              Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   TextButton.icon(
                     onPressed: () => _abrirDetalle(recogida),

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../constants/permission_constants.dart';
 import '../models/usuario.dart';
 import '../providers/usuarios_provider.dart';
+import '../widgets/responsive_center.dart';
 
 /// Formulario para crear un usuario nuevo (Operador o Subadministrador) o
 /// editar uno existente, incluyendo la asignación de sus permisos
@@ -120,13 +121,14 @@ class _CrearEditarUsuarioScreenState extends State<CrearEditarUsuarioScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextFormField(
-                  controller: _nombreController,
+          child: ResponsiveCenter(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    controller: _nombreController,
                   decoration: const InputDecoration(labelText: 'Nombre'),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Ingresa el nombre'
@@ -222,6 +224,7 @@ class _CrearEditarUsuarioScreenState extends State<CrearEditarUsuarioScreen> {
                   ),
                 ),
               ],
+              ),
             ),
           ),
         ),

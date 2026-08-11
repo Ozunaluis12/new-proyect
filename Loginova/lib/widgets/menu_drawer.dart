@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/permission_constants.dart';
 import '../providers/auth_provider.dart';
+import '../services/mi_empresa_service.dart';
 import '../themes/app_theme.dart';
 
 /// Drawer de navegación principal de la app: muestra opciones distintas
@@ -13,6 +15,11 @@ class MenuDrawer extends StatelessWidget {
   final String currentRoute;
 
   const MenuDrawer({super.key, required this.currentRoute});
+
+  // Número de WhatsApp de Soporte (con código de país de Colombia, 57), al
+  // que se dirige el botón "Contactar Soporte", visible para cualquier
+  // usuario autenticado de una empresa (no solo el Administrador).
+  static const String _telefonoSoporte = '573004177979';
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +106,20 @@ class MenuDrawer extends StatelessWidget {
                       Icons.point_of_sale,
                       'Historial de cierres',
                     ),
+                  // Sin "if (isAdmin)" a propósito: cualquier usuario
+                  // autenticado (Operador, Subadministrador, etc.) puede
+                  // necesitar soporte, no solo el Administrador de la
+                  // empresa.
+                  const Divider(height: 24),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.support_agent,
+                      color: LoginovaColors.success,
+                    ),
+                    title: const Text('Contactar Soporte'),
+                    subtitle: const Text('Escríbenos por WhatsApp'),
+                    onTap: () => _contactarSoporte(context, usuario?.nombre),
+                  ),
                 ],
               ),
             ),
@@ -120,6 +141,34 @@ class MenuDrawer extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Abre WhatsApp hacia Soporte con un mensaje prellenado identificando a
+  /// quién escribe (su nombre y, si se pudo consultar, el de su empresa —
+  /// cualquier rol: Administrador, Subadministrador, Operador, etc.), para
+  /// que Soporte no tenga que preguntar quién es antes de poder ayudar.
+  Future<void> _contactarSoporte(BuildContext context, String? nombreUsuario) async {
+    Navigator.pop(context);
+
+    final nombreEmpresa = await MiEmpresaService().obtenerNombreEmpresa();
+
+    final identificacion = nombreEmpresa != null
+        ? '${nombreUsuario ?? 'un usuario'} de $nombreEmpresa'
+        : (nombreUsuario ?? 'un usuario de Loginova');
+
+    final mensaje = 'Hola, soy $identificacion. Solicito soporte con Loginova.';
+
+    final uri = Uri.parse(
+      'https://wa.me/$_telefonoSoporte?text=${Uri.encodeComponent(mensaje)}',
+    );
+
+    final abierto = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    if (!abierto && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo abrir WhatsApp')),
+      );
+    }
   }
 
   /// Construye un ítem de navegación del drawer. Cierra el drawer al

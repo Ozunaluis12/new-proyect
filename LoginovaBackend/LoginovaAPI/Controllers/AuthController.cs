@@ -64,6 +64,11 @@ public class AuthController : ControllerBase
             return Unauthorized(new { mensaje = "Credenciales invalidas" });
         }
 
+        if (!usuario.Activo)
+        {
+            return Unauthorized(new { mensaje = "Esta cuenta está desactivada. Contacta a tu administrador o a soporte." });
+        }
+
         return Ok(CreateAuthResponse(usuario));
     }
 
@@ -82,7 +87,11 @@ public class AuthController : ControllerBase
         var usuario = await _context.Usuarios
             .IgnoreQueryFilters()
             .SingleOrDefaultAsync(item => item.Correo == request.Correo);
-        if (usuario is null)
+        // Cuenta inexistente o desactivada: misma respuesta genérica en ambos
+        // casos, para no revelar ni qué correos existen ni cuáles están
+        // desactivados, y para que una cuenta dada de baja no pueda usar este
+        // flujo para recuperar acceso.
+        if (usuario is null || !usuario.Activo)
         {
             return Ok(new { mensaje = respuestaGenerica });
         }
@@ -141,7 +150,7 @@ public class AuthController : ControllerBase
         var usuario = await _context.Usuarios
             .IgnoreQueryFilters()
             .SingleOrDefaultAsync(item => item.Correo == request.Correo);
-        if (usuario is null)
+        if (usuario is null || !usuario.Activo)
         {
             return BadRequest(new { mensaje = "Código inválido o expirado" });
         }
@@ -195,6 +204,6 @@ public class AuthController : ControllerBase
     {
         return new AuthResponse(
             _jwtTokenService.CreateToken(usuario),
-            new UsuarioResponse(usuario.Id, usuario.Nombre, usuario.Correo, usuario.Rol, usuario.Permisos));
+            new UsuarioResponse(usuario.Id, usuario.Nombre, usuario.Correo, usuario.Rol, usuario.Permisos, usuario.Activo));
     }
 }

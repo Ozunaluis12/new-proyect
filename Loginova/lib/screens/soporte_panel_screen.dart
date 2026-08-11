@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/dashboard_soporte.dart';
 import '../models/empresa.dart';
 import '../providers/auth_provider.dart';
 import '../providers/empresas_provider.dart';
+import '../services/configuracion_soporte_service.dart';
+import '../services/empresa_service.dart';
 import '../themes/app_theme.dart';
 import 'crear_editar_empresa_screen.dart';
+import 'soporte_buscador_screen.dart';
+import 'soporte_empresa_detalle_screen.dart';
+import 'soporte_equipo_screen.dart';
 
 /// Panel de Soporte: administra las empresas (tenants) que compraron
 /// Loginova en este mismo backend compartido — altas (junto con su primer
@@ -22,12 +29,178 @@ class SoportePanelScreen extends StatefulWidget {
 }
 
 class _SoportePanelScreenState extends State<SoportePanelScreen> {
+  final _empresaService = EmpresaService();
+  final _configuracionService = ConfiguracionSoporteService();
+  final _busquedaController = TextEditingController();
+  String _busqueda = '';
+  String _filtroEstado = 'TODAS';
+  DashboardSoporte? _dashboard;
+  bool _exportando = false;
+
+  // Plantillas de recordatorio: se cargan del backend (editables desde el
+  // ícono de ajustes); estos valores solo se usan como respaldo si todavía
+  // no terminó de cargar o si la carga falla.
+  String _plantillaVigente =
+      'Hola {contacto}, te escribimos de Loginova: la membresía de {empresa} '
+      'vence el {fecha}. ¿Deseas que gestionemos la renovación?';
+  String _plantillaVencida =
+      'Hola {contacto}, te escribimos de Loginova: la membresía de {empresa} '
+      'venció el {fecha}. ¿Deseas renovarla para seguir usando el sistema '
+      'sin interrupciones?';
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<EmpresasProvider>(context, listen: false).cargarEmpresas();
+      _cargarDashboard();
+      _cargarPlantillas();
     });
+  }
+
+  Future<void> _cargarPlantillas() async {
+    try {
+      final config = await _configuracionService.obtener();
+      if (!mounted) return;
+      setState(() {
+        _plantillaVigente = config['plantillaRecordatorioVigente']!;
+        _plantillaVencida = config['plantillaRecordatorioVencida']!;
+      });
+    } catch (_) {
+      // Si falla, se siguen usando las plantillas por defecto de arriba.
+    }
+  }
+
+  Future<void> _editarPlantillas() async {
+    final vigenteController = TextEditingController(text: _plantillaVigente);
+    final vencidaController = TextEditingController(text: _plantillaVencida);
+
+    final guardar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Plantillas de WhatsApp'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Placeholders disponibles: {contacto}, {empresa}, {fecha}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              const Text('Membresía vigente (recordatorio anticipado)'),
+              const SizedBox(height: 4),
+              TextField(
+                controller: vigenteController,
+                minLines: 2,
+                maxLines: 4,
+              ),
+              const SizedBox(height: 16),
+              const Text('Membresía vencida'),
+              const SizedBox(height: 4),
+              TextField(
+                controller: vencidaController,
+                minLines: 2,
+                maxLines: 4,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+
+    if (guardar != true || !mounted) return;
+
+    try {
+      await _configuracionService.actualizar(
+        plantillaVigente: vigenteController.text,
+        plantillaVencida: vencidaController.text,
+      );
+      if (!mounted) return;
+      setState(() {
+        _plantillaVigente = vigenteController.text;
+        _plantillaVencida = vencidaController.text;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Plantillas actualizadas'),
+          backgroundColor: LoginovaColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: LoginovaColors.error),
+      );
+    }
+  }
+
+  void _abrirBuscador() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SoporteBuscadorScreen()),
+    );
+  }
+
+  @override
+  void dispose() {
+    _busquedaController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _cargarDashboard() async {
+    try {
+      final dashboard = await _empresaService.obtenerDashboard();
+      if (!mounted) return;
+      setState(() => _dashboard = dashboard);
+    } catch (_) {
+      // El resumen agregado es informativo, no bloqueante: si falla, el
+      // panel sigue funcionando normal sin él.
+    }
+  }
+
+  // XFile.fromData (bytes en memoria) en vez de escribir a un archivo
+  // temporal con path_provider: path_provider no tiene implementación para
+  // Flutter Web, así que escribir a disco fallaría ahí; XFile.fromData
+  // funciona igual en todas las plataformas (en web dispara la descarga
+  // del navegador).
+  Future<void> _exportarCsv() async {
+    setState(() => _exportando = true);
+    try {
+      final bytes = await _empresaService.exportarEmpresasCsv();
+
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              bytes,
+              name: 'empresas_${DateTime.now().millisecondsSinceEpoch}.csv',
+              mimeType: 'text/csv',
+            ),
+          ],
+          text: 'Listado de empresas',
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error exportando CSV: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _exportando = false);
+    }
   }
 
   Color _colorEstado(String estado) {
@@ -62,6 +235,26 @@ class _SoportePanelScreenState extends State<SoportePanelScreen> {
     return '$dd/$mm/${fecha.year}';
   }
 
+  /// Aplica la búsqueda por nombre/contacto y el filtro de estado sobre la
+  /// lista ya cargada, sin volver a pedirla al backend.
+  List<Empresa> _empresasFiltradas(List<Empresa> empresas) {
+    var resultado = _filtroEstado == 'TODAS'
+        ? empresas
+        : empresas.where((e) => e.estadoMembresia == _filtroEstado).toList();
+
+    final query = _busqueda.trim().toLowerCase();
+    if (query.isEmpty) return resultado;
+
+    return resultado.where((e) {
+      final nombre = e.nombreEmpresa.toLowerCase();
+      final contacto = (e.nombreContacto ?? '').toLowerCase();
+      final telefono = (e.telefonoContacto ?? '').toLowerCase();
+      return nombre.contains(query) ||
+          contacto.contains(query) ||
+          telefono.contains(query);
+    }).toList();
+  }
+
   /// Abre WhatsApp con un mensaje de recordatorio ya redactado para el
   /// contacto de la empresa. No usa ninguna API de WhatsApp (esto sería
   /// costoso/complejo de mantener): es el link estándar de "click to chat",
@@ -86,16 +279,14 @@ class _SoportePanelScreenState extends State<SoportePanelScreen> {
         ? empresa.nombreContacto!
         : empresa.nombreEmpresa;
 
-    final mensaje = empresa.diasParaVencimiento < 0
-        ? 'Hola $contacto, te escribimos de Loginova: la membresía de '
-              '${empresa.nombreEmpresa} venció el '
-              '${_formatearFecha(empresa.fechaFinMembresia)}. '
-              '¿Deseas renovarla para seguir usando el sistema sin '
-              'interrupciones?'
-        : 'Hola $contacto, te escribimos de Loginova: la membresía de '
-              '${empresa.nombreEmpresa} vence el '
-              '${_formatearFecha(empresa.fechaFinMembresia)}. '
-              '¿Deseas que gestionemos la renovación?';
+    final plantilla = empresa.diasParaVencimiento < 0
+        ? _plantillaVencida
+        : _plantillaVigente;
+
+    final mensaje = plantilla
+        .replaceAll('{contacto}', contacto)
+        .replaceAll('{empresa}', empresa.nombreEmpresa)
+        .replaceAll('{fecha}', _formatearFecha(empresa.fechaFinMembresia));
 
     final uri = Uri.parse(
       'https://wa.me/$telefono?text=${Uri.encodeComponent(mensaje)}',
@@ -155,6 +346,25 @@ class _SoportePanelScreenState extends State<SoportePanelScreen> {
     );
   }
 
+  void _abrirDetalle(Empresa empresa) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SoporteEmpresaDetalleScreen(
+          empresaId: empresa.id,
+          nombreEmpresa: empresa.nombreEmpresa,
+        ),
+      ),
+    );
+  }
+
+  void _abrirEquipo() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SoporteEquipoScreen()),
+    );
+  }
+
   Future<void> _confirmarCambiarActiva(Empresa empresa) async {
     final activar = !empresa.activa;
     final confirmado = await showDialog<bool>(
@@ -195,6 +405,7 @@ class _SoportePanelScreenState extends State<SoportePanelScreen> {
     } else {
       await provider.suspenderEmpresa(empresa.id);
     }
+    await _cargarDashboard();
   }
 
   @override
@@ -203,7 +414,73 @@ class _SoportePanelScreenState extends State<SoportePanelScreen> {
       appBar: AppBar(
         title: const Text('Panel de Soporte'),
         elevation: 0,
+        // Menú de opciones en vez de varios IconButton sueltos: con 5
+        // acciones posibles, ponerlas todas como íconos directos se
+        // desborda en un celular angosto (el mismo problema que ya
+        // corregimos en la tarjeta de empresa). Solo "Cerrar sesión" queda
+        // como ícono directo, por ser la acción más usada.
         actions: [
+          if (_exportando)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (accion) {
+              switch (accion) {
+                case 'buscar':
+                  _abrirBuscador();
+                case 'exportar':
+                  _exportarCsv();
+                case 'equipo':
+                  _abrirEquipo();
+                case 'plantillas':
+                  _editarPlantillas();
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'buscar',
+                child: ListTile(
+                  leading: Icon(Icons.person_search),
+                  title: Text('Buscar por correo'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'exportar',
+                child: ListTile(
+                  leading: Icon(Icons.file_download),
+                  title: Text('Exportar CSV'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'equipo',
+                child: ListTile(
+                  leading: Icon(Icons.groups),
+                  title: Text('Equipo de Soporte'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'plantillas',
+                child: ListTile(
+                  leading: Icon(Icons.chat_outlined),
+                  title: Text('Plantillas de WhatsApp'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesión',
@@ -234,29 +511,33 @@ class _SoportePanelScreenState extends State<SoportePanelScreen> {
             return _buildEmptyState();
           }
 
-          final vencidas = provider.empresas
-              .where((e) => e.estadoMembresia == 'Vencida')
-              .length;
-          final porVencer = provider.empresas
-              .where((e) => e.estadoMembresia == 'PorVencer')
-              .length;
-          final suspendidas = provider.empresas
-              .where((e) => e.estadoMembresia == 'Suspendida')
-              .length;
+          final empresasFiltradas = _empresasFiltradas(provider.empresas);
 
           return RefreshIndicator(
-            onRefresh: provider.cargarEmpresas,
+            onRefresh: () async {
+              await provider.cargarEmpresas();
+              await _cargarDashboard();
+            },
             child: Column(
               children: [
-                if (vencidas > 0 || porVencer > 0 || suspendidas > 0)
-                  _buildResumen(vencidas, porVencer, suspendidas),
+                if (_dashboard != null) _buildDashboard(_dashboard!),
+                _buildBusquedaYFiltros(),
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: provider.empresas.length,
-                    itemBuilder: (context, index) =>
-                        _buildEmpresaCard(provider.empresas[index]),
-                  ),
+                  child: empresasFiltradas.isEmpty
+                      ? ListView(
+                          children: const [
+                            SizedBox(height: 80),
+                            Center(
+                              child: Text('Ninguna empresa coincide con la búsqueda.'),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: empresasFiltradas.length,
+                          itemBuilder: (context, index) =>
+                              _buildEmpresaCard(empresasFiltradas[index]),
+                        ),
                 ),
               ],
             ),
@@ -266,45 +547,127 @@ class _SoportePanelScreenState extends State<SoportePanelScreen> {
     );
   }
 
-  Widget _buildResumen(int vencidas, int porVencer, int suspendidas) {
+  Widget _buildDashboard(DashboardSoporte dashboard) {
     return Container(
       width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildDashboardCard(
+              'Empresas activas',
+              '${dashboard.empresasActivas}/${dashboard.totalEmpresas}',
+              Icons.business,
+              LoginovaColors.primary,
+            ),
+            const SizedBox(width: 8),
+            _buildDashboardCard(
+              'Ingreso mensual est.',
+              '\$${dashboard.ingresoMensualEstimado.toStringAsFixed(0)}',
+              Icons.payments,
+              LoginovaColors.success,
+            ),
+            const SizedBox(width: 8),
+            _buildDashboardCard(
+              'Por vencer (7 días)',
+              dashboard.empresasPorVencer.toString(),
+              Icons.warning_amber,
+              LoginovaColors.warning,
+            ),
+            const SizedBox(width: 8),
+            _buildDashboardCard(
+              'Vencidas',
+              dashboard.empresasVencidas.toString(),
+              Icons.error_outline,
+              LoginovaColors.error,
+            ),
+            const SizedBox(width: 8),
+            _buildDashboardCard(
+              'Sin actividad (30d)',
+              dashboard.empresasSinActividadReciente.toString(),
+              Icons.bedtime,
+              LoginovaColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      width: 150,
       padding: const EdgeInsets.all(12),
-      color: LoginovaColors.background,
-      child: Wrap(
-        spacing: 8,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (vencidas > 0)
-            Chip(
-              avatar: const Icon(Icons.error, color: Colors.white, size: 18),
-              label: Text('$vencidas vencida${vencidas == 1 ? '' : 's'}'),
-              backgroundColor: LoginovaColors.error,
-              labelStyle: const TextStyle(color: Colors.white),
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
-          if (porVencer > 0)
-            Chip(
-              avatar: const Icon(
-                Icons.warning,
-                color: Colors.white,
-                size: 18,
-              ),
-              label: Text('$porVencer por vencer (7 días)'),
-              backgroundColor: LoginovaColors.warning,
-              labelStyle: const TextStyle(color: Colors.white),
+          ),
+          Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBusquedaYFiltros() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      child: Column(
+        children: [
+          TextField(
+            controller: _busquedaController,
+            decoration: InputDecoration(
+              hintText: 'Buscar por nombre o contacto',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _busqueda.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _busquedaController.clear();
+                        setState(() => _busqueda = '');
+                      },
+                    ),
             ),
-          if (suspendidas > 0)
-            Chip(
-              avatar: const Icon(
-                Icons.pause_circle_outline,
-                color: Colors.white,
-                size: 18,
-              ),
-              label: Text(
-                '$suspendidas suspendida${suspendidas == 1 ? '' : 's'}',
-              ),
-              backgroundColor: LoginovaColors.textSecondary,
-              labelStyle: const TextStyle(color: Colors.white),
+            onChanged: (value) => setState(() => _busqueda = value),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              spacing: 8,
+              children: ['TODAS', 'Vigente', 'PorVencer', 'Vencida', 'Suspendida']
+                  .map(
+                    (estado) => ChoiceChip(
+                      label: Text(estado == 'PorVencer' ? 'Por vencer' : estado),
+                      selected: _filtroEstado == estado,
+                      onSelected: (_) => setState(() => _filtroEstado = estado),
+                    ),
+                  )
+                  .toList(),
             ),
+          ),
         ],
       ),
     );
@@ -391,8 +754,14 @@ class _SoportePanelScreenState extends State<SoportePanelScreen> {
                 ),
               ],
               const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              // Wrap en vez de Row: con 4 acciones posibles, un celular
+              // angosto no alcanza a mostrarlas todas en una sola línea.
+              // Wrap las pasa a una segunda línea en vez de desbordar la
+              // tarjeta (que es justo lo que pasaba con Row).
+              Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 4,
                 children: [
                   if ((empresa.telefonoContacto ?? '').isNotEmpty)
                     TextButton.icon(
@@ -400,6 +769,11 @@ class _SoportePanelScreenState extends State<SoportePanelScreen> {
                       icon: const Icon(Icons.chat, size: 18),
                       label: const Text('WhatsApp'),
                     ),
+                  TextButton.icon(
+                    onPressed: () => _abrirDetalle(empresa),
+                    icon: const Icon(Icons.support_agent, size: 18),
+                    label: const Text('Detalle'),
+                  ),
                   TextButton.icon(
                     onPressed: () => _abrirFormulario(empresa: empresa),
                     icon: const Icon(Icons.edit_outlined, size: 18),

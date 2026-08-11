@@ -164,18 +164,27 @@ class _DetalleCierreSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(cierre.operadorNombre, style: Theme.of(context).textTheme.headlineSmall),
+            Text(
+              cierre.operadorNombre,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             Text(
               _formatearFecha(cierre.fechaCreacion),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _resumenItem('Total', cierre.montoTotal, LoginovaColors.primary),
-                _resumenItem('Efectivo', cierre.montoEfectivo, LoginovaColors.success),
-                _resumenItem('Transferencia', cierre.montoTransferencia, LoginovaColors.info),
+                Expanded(
+                  child: _resumenItem(context, 'Total', cierre.montoTotal, LoginovaColors.primary),
+                ),
+                Expanded(
+                  child: _resumenItem(context, 'Efectivo', cierre.montoEfectivo, LoginovaColors.success),
+                ),
+                Expanded(
+                  child: _resumenItem(context, 'Transferencia', cierre.montoTransferencia, LoginovaColors.info),
+                ),
               ],
             ),
             if ((cierre.observaciones ?? '').isNotEmpty) ...[
@@ -205,13 +214,23 @@ class _DetalleCierreSheet extends StatelessWidget {
     );
   }
 
-  Widget _resumenItem(String label, double valor, Color color) {
+  Widget _resumenItem(BuildContext context, String label, double valor, Color color) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 12)),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelSmall,
+        ),
+        const SizedBox(height: 2),
         Text(
           _formatoMoneda.format(valor),
-          style: TextStyle(fontWeight: FontWeight.bold, color: color),
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(color: color),
         ),
       ],
     );

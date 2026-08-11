@@ -12,6 +12,14 @@ class AuthResult {
   AuthResult({required this.token, required this.usuario});
 }
 
+/// Login rechazado por el backend, con el mensaje real que envió (p. ej.
+/// "Credenciales invalidas" o "Esta cuenta está desactivada..."). Sin esto,
+/// el login solo podía distinguir éxito/fracaso y perdía por qué falló.
+class AuthException implements Exception {
+  final String mensaje;
+  AuthException(this.mensaje);
+}
+
 /// Servicio que gestiona las peticiones de autenticación al backend: login
 /// y el flujo de dos pasos de recuperación de contraseña (solicitar código
 /// por correo y luego resetear con ese código). No hay registro público:
@@ -26,7 +34,19 @@ class AuthService {
     );
 
     if (response.statusCode != 200) {
-      return null;
+      // El backend distingue credenciales inválidas de cuenta desactivada
+      // (mensajes distintos); se propaga el mensaje real en vez de asumir
+      // siempre "credenciales incorrectas".
+      var mensaje = 'Correo o contraseña incorrectos';
+      try {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (data['mensaje'] is String) {
+          mensaje = data['mensaje'] as String;
+        }
+      } catch (_) {
+        // Respuesta sin cuerpo JSON válido: se mantiene el mensaje genérico.
+      }
+      throw AuthException(mensaje);
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
