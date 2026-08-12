@@ -1,11 +1,11 @@
 {
-    "name": "loginova",
-    "short_name": "loginova",
+    "name": "Loginova",
+    "short_name": "Loginova",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1E88E5",
+    "theme_color": "#1E88E5",
+    "description": "Gestión logística y recolección en tiempo real.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
