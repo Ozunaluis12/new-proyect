@@ -3,6 +3,7 @@ using LoginovaAPI.Data;
 using LoginovaAPI.DTOs;
 using LoginovaAPI.Models;
 using LoginovaAPI.Services;
+using LoginovaAPI.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -62,9 +63,10 @@ public class EmpresasController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<EmpresaResponse>> Create(CrearEmpresaRequest request)
     {
+        var correoAdminNormalizado = CorreoUtils.Normalizar(request.AdminCorreo);
         var correoDuplicado = await _context.Usuarios
             .IgnoreQueryFilters()
-            .AnyAsync(u => u.EmpresaId != null && u.Correo == request.AdminCorreo);
+            .AnyAsync(u => u.EmpresaId != null && u.Correo == correoAdminNormalizado);
         // La unicidad real es (EmpresaId, Correo), así que un correo repetido entre
         // empresas distintas es válido; este chequeo es solo una guía útil para
         // Soporte por si reutiliza sin querer el correo de una empresa que ya existe,
@@ -91,7 +93,7 @@ public class EmpresasController : ControllerBase
         {
             EmpresaId = empresa.Id,
             Nombre = request.AdminNombre,
-            Correo = request.AdminCorreo,
+            Correo = correoAdminNormalizado,
             Password = _passwordHasher.Hash(request.AdminPassword),
             RoleId = role.Id,
             PermisosJson = "[]",
@@ -681,12 +683,13 @@ public class EmpresasController : ControllerBase
             return BadRequest(new { mensaje = "Ingresa un correo" });
         }
 
+        var correoNormalizado = CorreoUtils.Normalizar(correo);
         var usuario = await _context.Usuarios
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(u => u.Role)
             .Include(u => u.Empresa)
-            .FirstOrDefaultAsync(u => u.Correo == correo);
+            .FirstOrDefaultAsync(u => u.Correo == correoNormalizado);
 
         if (usuario is null)
         {

@@ -2,6 +2,7 @@ using LoginovaAPI.Data;
 using LoginovaAPI.DTOs;
 using LoginovaAPI.Models;
 using LoginovaAPI.Services;
+using LoginovaAPI.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -53,7 +54,9 @@ public class SoporteUsuariosController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<UsuarioResponse>> Create(CrearSoporteUsuarioRequest request)
     {
-        if (await _context.Usuarios.IgnoreQueryFilters().AnyAsync(u => u.Correo == request.Correo))
+        var correoNormalizado = CorreoUtils.Normalizar(request.Correo);
+
+        if (await _context.Usuarios.IgnoreQueryFilters().AnyAsync(u => u.Correo == correoNormalizado))
         {
             return Conflict(new { mensaje = "El correo ya está registrado" });
         }
@@ -64,7 +67,7 @@ public class SoporteUsuariosController : ControllerBase
         {
             EmpresaId = null,
             Nombre = request.Nombre,
-            Correo = request.Correo,
+            Correo = correoNormalizado,
             Password = _passwordHasher.Hash(request.Password),
             RoleId = role.Id,
             PermisosJson = "[]",

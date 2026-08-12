@@ -3,6 +3,7 @@ using LoginovaAPI.Data;
 using LoginovaAPI.DTOs;
 using LoginovaAPI.Models;
 using LoginovaAPI.Services;
+using LoginovaAPI.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -54,10 +55,11 @@ public class AuthController : ControllerBase
         // Usuario filtraría a "sin empresa" y solo encontraría cuentas
         // Soporte. El login busca por correo en TODAS las empresas — el
         // correo es único a nivel global justo para que esto sea seguro.
+        var correoNormalizado = CorreoUtils.Normalizar(request.Correo);
         var usuario = await _context.Usuarios
             .IgnoreQueryFilters()
             .Include(item => item.Role)
-            .SingleOrDefaultAsync(item => item.Correo == request.Correo);
+            .SingleOrDefaultAsync(item => item.Correo == correoNormalizado);
 
         if (usuario is null || !_passwordHasher.Verify(request.Password, usuario.Password))
         {
@@ -84,9 +86,10 @@ public class AuthController : ControllerBase
 
         // IgnoreQueryFilters: mismo motivo que en Login, todavía no hay
         // empresaId ambiente en este request sin autenticar.
+        var correoNormalizado = CorreoUtils.Normalizar(request.Correo);
         var usuario = await _context.Usuarios
             .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(item => item.Correo == request.Correo);
+            .SingleOrDefaultAsync(item => item.Correo == correoNormalizado);
         // Cuenta inexistente o desactivada: misma respuesta genérica en ambos
         // casos, para no revelar ni qué correos existen ni cuáles están
         // desactivados, y para que una cuenta dada de baja no pueda usar este
@@ -147,9 +150,10 @@ public class AuthController : ControllerBase
     /// </summary>
     public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
     {
+        var correoNormalizado = CorreoUtils.Normalizar(request.Correo);
         var usuario = await _context.Usuarios
             .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(item => item.Correo == request.Correo);
+            .SingleOrDefaultAsync(item => item.Correo == correoNormalizado);
         if (usuario is null || !usuario.Activo)
         {
             return BadRequest(new { mensaje = "Código inválido o expirado" });

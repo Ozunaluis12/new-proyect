@@ -2,6 +2,7 @@ using LoginovaAPI.Data;
 using LoginovaAPI.DTOs;
 using LoginovaAPI.Models;
 using LoginovaAPI.Services;
+using LoginovaAPI.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -62,10 +63,12 @@ public class UsuariosController : ControllerBase
     [Authorize(Roles = "Administrador")]
     public async Task<ActionResult<UsuarioResponse>> Create(UsuarioCreateRequest request)
     {
+        var correoNormalizado = CorreoUtils.Normalizar(request.Correo);
+
         // IgnoreQueryFilters: el correo es único a nivel global (todas las
         // empresas), no solo dentro de la empresa actual, así que el
         // chequeo de duplicado debe mirar más allá del filtro de tenant.
-        if (await _context.Usuarios.IgnoreQueryFilters().AnyAsync(usuario => usuario.Correo == request.Correo))
+        if (await _context.Usuarios.IgnoreQueryFilters().AnyAsync(usuario => usuario.Correo == correoNormalizado))
         {
             return Conflict(new { mensaje = "El correo ya esta registrado" });
         }
@@ -97,7 +100,7 @@ public class UsuariosController : ControllerBase
             // hay que fijarlo explícito con la empresa del admin que crea.
             EmpresaId = _tenant.EmpresaId,
             Nombre = request.Nombre,
-            Correo = request.Correo,
+            Correo = correoNormalizado,
             Password = _passwordHasher.Hash(request.Password),
             RoleId = role.Id,
         };
@@ -139,7 +142,9 @@ public class UsuariosController : ControllerBase
             return NotFound();
         }
 
-        if (await _context.Usuarios.IgnoreQueryFilters().AnyAsync(u => u.Correo == request.Correo && u.Id != id))
+        var correoNormalizado = CorreoUtils.Normalizar(request.Correo);
+
+        if (await _context.Usuarios.IgnoreQueryFilters().AnyAsync(u => u.Correo == correoNormalizado && u.Id != id))
         {
             return Conflict(new { mensaje = "El correo ya esta registrado por otro usuario" });
         }
@@ -164,7 +169,7 @@ public class UsuariosController : ControllerBase
         var valoresAnteriores = new { usuario.Nombre, usuario.Correo, usuario.Rol, Permisos = usuario.Permisos };
 
         usuario.Nombre = request.Nombre;
-        usuario.Correo = request.Correo;
+        usuario.Correo = correoNormalizado;
         usuario.RoleId = role.Id;
         usuario.EstablecerPermisos(PermisosService.NormalizarPermisos(request.Permisos));
 
