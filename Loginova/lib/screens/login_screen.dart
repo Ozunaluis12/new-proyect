@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../themes/app_theme.dart';
+import '../widgets/animated_logo.dart';
+import '../widgets/animated_title.dart';
 import '../widgets/responsive_center.dart';
 
 /// Pantalla profesional de inicio de sesión con validaciones y diseño moderno.
@@ -218,47 +220,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [LoginovaColors.primary, LoginovaColors.primaryDark],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: LoginovaColors.primary.withValues(alpha: 0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.local_shipping,
-            color: Colors.white,
-            size: 40,
-          ),
-        ),
+        const AnimatedLogo(width: 240, height: 118),
         const SizedBox(height: 20),
-        const Text(
-          'LOGINOVA',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: LoginovaColors.primary,
-            letterSpacing: 2,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Gestión Logística Profesional',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyLarge?.copyWith(color: LoginovaColors.textSecondary),
-        ),
+        const AnimatedTitle(),
       ],
     );
   }

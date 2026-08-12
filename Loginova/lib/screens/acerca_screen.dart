@@ -33,22 +33,44 @@ class AcercaScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        'LOGINOVA',
-                        style: TextStyle(
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.local_shipping_rounded,
                           color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
+                          size: 26,
                         ),
                       ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Gestión logística y recolección en tiempo real.',
-                        style: TextStyle(color: Colors.white70),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'LOGINOVA',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Gestión logística y recolección en tiempo real.',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
