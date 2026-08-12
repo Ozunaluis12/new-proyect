@@ -71,12 +71,18 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
     // Login y recuperación de contraseña son los blancos típicos de fuerza bruta.
-    options.AddFixedWindowLimiter("auth", limiterOptions =>
-    {
-        limiterOptions.PermitLimit = 10;
-        limiterOptions.Window = TimeSpan.FromMinutes(1);
-        limiterOptions.QueueLimit = 0;
-    });
+    // Particionado por IP: AddFixedWindowLimiter (sin partición) comparte un
+    // único contador global entre TODOS los clientes, así que el tráfico de
+    // un usuario (o de pruebas) agota la cuota de todos los demás. Con
+    // GetFixedWindowLimiter cada IP tiene su propio balde de 10/minuto.
+    options.AddPolicy("auth", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
 });
 
 var allowedOrigins = builder.Configuration
