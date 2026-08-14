@@ -30,6 +30,24 @@ public class Empresa
     [Column("correo_contacto")]
     public string? CorreoContacto { get; set; }
 
+    /// <summary>
+    /// Ciudad donde opera la empresa (ej. "Bucaramanga, Santander"). Junto con
+    /// <see cref="LatitudOperacion"/>/<see cref="LongitudOperacion"/>, se usa
+    /// como sesgo por defecto del buscador de direcciones de la app cuando el
+    /// operador todavía no tiene GPS disponible, para que las sugerencias no
+    /// aparezcan de otra ciudad. Configurable por Soporte al crear/editar la
+    /// empresa; las coordenadas se resuelven geocodificando este texto desde
+    /// la propia app (el backend no llama a ningún servicio de mapas).
+    /// </summary>
+    [Column("ciudad_operacion")]
+    public string? CiudadOperacion { get; set; }
+
+    [Column("latitud_operacion")]
+    public double? LatitudOperacion { get; set; }
+
+    [Column("longitud_operacion")]
+    public double? LongitudOperacion { get; set; }
+
     [Column("fecha_inicio_membresia")]
     public DateTime FechaInicioMembresia { get; set; }
 

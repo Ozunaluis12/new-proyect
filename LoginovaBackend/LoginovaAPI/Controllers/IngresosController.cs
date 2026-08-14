@@ -4,6 +4,7 @@ using LoginovaAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace LoginovaAPI.Controllers;
@@ -342,7 +343,14 @@ public class IngresosController : ControllerBase
     public async Task<IActionResult> CierreAutomatico([FromHeader(Name = "X-Cron-Secret")] string? secret)
     {
         var secretoEsperado = _configuration["CierreAutomatico:Secret"];
-        if (string.IsNullOrWhiteSpace(secretoEsperado) || !string.Equals(secret, secretoEsperado, StringComparison.Ordinal))
+        // Comparación en tiempo constante (igual que PasswordHasher.Verify): un
+        // string.Equals normal corta en el primer byte distinto, y la diferencia
+        // de tiempo es en teoría explotable para adivinar el secreto carácter a
+        // carácter contra un endpoint público como este.
+        if (string.IsNullOrWhiteSpace(secretoEsperado) || string.IsNullOrEmpty(secret) ||
+            !CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(secret),
+                Encoding.UTF8.GetBytes(secretoEsperado)))
         {
             return Unauthorized();
         }

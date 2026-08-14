@@ -40,7 +40,12 @@ public class MiEmpresaController : ControllerBase
         var empresa = await _context.Empresas
             .AsNoTracking()
             .Where(e => e.Id == _tenant.EmpresaId)
-            .Select(e => new MiEmpresaResponse(e.Id, e.NombreEmpresa))
+            .Select(e => new MiEmpresaResponse(
+                e.Id,
+                e.NombreEmpresa,
+                e.CiudadOperacion,
+                e.LatitudOperacion,
+                e.LongitudOperacion))
             .FirstOrDefaultAsync();
 
         return empresa is null ? NotFound() : Ok(empresa);

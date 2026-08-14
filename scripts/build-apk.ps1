@@ -1,6 +1,10 @@
 param(
     [string]$ApiBaseUrl = 'http://127.0.0.1:5105/api',
     [string]$FlutterProject = '..\Loginova',
+    # Token de Mapbox para autocompletado de direcciones más preciso (opcional).
+    # Si se omite, usa $env:MAPBOX_ACCESS_TOKEN si está definida, o cae a
+    # Nominatim/OpenStreetMap (gratis, sin token, funciona igual).
+    [string]$MapboxToken = $env:MAPBOX_ACCESS_TOKEN,
     [switch]$PubGet
 )
 
@@ -42,7 +46,14 @@ if ($PubGet) {
     flutter pub get
 }
 
-flutter build apk --release --dart-define="API_BASE_URL=$ApiBaseUrl"
+$dartDefines = @("API_BASE_URL=$ApiBaseUrl")
+if ($MapboxToken) {
+    Write-Host 'Build-apk: MAPBOX_ACCESS_TOKEN detectado, se usará Mapbox para direcciones.' -ForegroundColor Yellow
+    $dartDefines += "MAPBOX_ACCESS_TOKEN=$MapboxToken"
+}
+$dartDefineArgs = @($dartDefines | ForEach-Object { "--dart-define=$_" })
+
+flutter build apk --release @dartDefineArgs
 $exitCode = $LASTEXITCODE
 Pop-Location
 exit $exitCode

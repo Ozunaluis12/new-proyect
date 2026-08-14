@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Config de Firebase por dispositivo/entorno: cada dev/CI la coloca a mano
+# (ver pasos de configuración de Firebase), no viaja en el repo.
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist
+/macos/Runner/GoogleService-Info.plist

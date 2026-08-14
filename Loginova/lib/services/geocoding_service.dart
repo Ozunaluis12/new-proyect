@@ -43,6 +43,39 @@ class GeocodingService {
   // para cubrir una ciudad y sus alrededores sin restringir de más.
   static const double _nearbyBoxDegrees = 0.5;
 
+  // Ciudad de operación de la empresa del usuario logueado (ver Empresa en
+  // el backend), usada como sesgo por defecto cuando aún no se conoce su
+  // ubicación GPS real. No hay una ciudad fija en el código: quien inicia la
+  // sesión la fija llamando a [configurarUbicacionPorDefecto] con lo que
+  // devuelve `/miempresa`. Si nunca se configura (empresa sin ciudad
+  // definida, o antes de que cargue esa respuesta), la búsqueda sigue
+  // funcionando, solo sin sesgo de ciudad — restringida únicamente a
+  // Colombia por `countrycodes`.
+  static double? _defaultLatitude;
+  static double? _defaultLongitude;
+
+  /// Fija la ubicación que se usa como sesgo por defecto cuando todavía no
+  /// se conoce el GPS real del operador. Se llama una vez al iniciar sesión
+  /// (o al restaurar la sesión guardada) con la ciudad de operación de la
+  /// empresa del usuario logueado.
+  static void configurarUbicacionPorDefecto(double? latitud, double? longitud) {
+    _defaultLatitude = latitud;
+    _defaultLongitude = longitud;
+  }
+
+  /// Ciudad de operación configurada (ver [configurarUbicacionPorDefecto]),
+  /// para que las pantallas de mapa puedan centrarse ahí como alternativa al
+  /// GPS real, en vez de una ciudad fija en el código.
+  static double? get ubicacionPorDefectoLatitud => _defaultLatitude;
+  static double? get ubicacionPorDefectoLongitud => _defaultLongitude;
+
+  // La política de uso de Nominatim exige un User-Agent con datos de
+  // contacto real; sin eso pueden bloquear la IP si hay tráfico sostenido.
+  static const Map<String, String> _nominatimHeaders = {
+    'Accept': 'application/json',
+    'User-Agent': 'Loginova/1.0 (ozunaluis872@gmail.com)',
+  };
+
   /// Obtiene múltiples direcciones candidatas para una búsqueda, con sus
   /// coordenadas ya resueltas.
   static Future<List<AddressSuggestion>> searchAddresses(
@@ -126,8 +159,10 @@ class GeocodingService {
         'limit': limit.toString(),
       };
 
-      if (nearLatitude != null && nearLongitude != null) {
-        params['proximity'] = '$nearLongitude,$nearLatitude';
+      final proximityLat = nearLatitude ?? _defaultLatitude;
+      final proximityLon = nearLongitude ?? _defaultLongitude;
+      if (proximityLat != null && proximityLon != null) {
+        params['proximity'] = '$proximityLon,$proximityLat';
       }
 
       final uri = Uri.parse(
@@ -225,6 +260,7 @@ class GeocodingService {
     int limit = 4,
     double? nearLatitude,
     double? nearLongitude,
+    bool bounded = false,
   }) {
     final params = <String, String>{
       'format': 'jsonv2',
@@ -232,18 +268,33 @@ class GeocodingService {
       'q': query,
       'addressdetails': '1',
       'accept-language': 'es',
+      // Restringe siempre a Colombia: evita que una dirección genérica (ej.
+      // "Calle 10 # 5-20") traiga como primer resultado una coincidencia en
+      // otro país.
+      'countrycodes': 'co',
     };
 
-    if (nearLatitude != null && nearLongitude != null) {
-      // Sesga los resultados hacia la zona donde está el usuario, para que una
-      // dirección genérica (ej. "Calle 10 # 5-20") no traiga coincidencias en
-      // otro país. No es una restricción dura: si no hay nada cerca, Nominatim
-      // igual puede devolver resultados fuera de la caja.
-      final minLon = nearLongitude - _nearbyBoxDegrees;
-      final maxLon = nearLongitude + _nearbyBoxDegrees;
-      final minLat = nearLatitude - _nearbyBoxDegrees;
-      final maxLat = nearLatitude + _nearbyBoxDegrees;
+    // Cuando se pide una búsqueda acotada ("bounded") y no se conoce todavía
+    // la ubicación GPS real del usuario, se usa la ciudad de operación de su
+    // empresa (ver [configurarUbicacionPorDefecto]) como centro por defecto.
+    // Si tampoco hay eso configurado, no hay caja: la búsqueda queda
+    // restringida solo a Colombia.
+    final lat = nearLatitude ?? (bounded ? _defaultLatitude : null);
+    final lon = nearLongitude ?? (bounded ? _defaultLongitude : null);
+
+    if (lat != null && lon != null) {
+      final minLon = lon - _nearbyBoxDegrees;
+      final maxLon = lon + _nearbyBoxDegrees;
+      final minLat = lat - _nearbyBoxDegrees;
+      final maxLat = lat + _nearbyBoxDegrees;
       params['viewbox'] = '$minLon,$maxLat,$maxLon,$minLat';
+      if (bounded) {
+        // A diferencia del viewbox suelto (solo un sesgo), esto vuelve la
+        // caja una restricción dura: Nominatim no devuelve nada fuera de
+        // ella. Es lo que hacía que, aunque hubiera sesgo, direcciones de
+        // otras ciudades igual ganaran por tener mejor puntaje interno.
+        params['bounded'] = '1';
+      }
     }
 
     return Uri.parse(
@@ -269,29 +320,48 @@ class GeocodingService {
     double? nearLongitude,
   }) async {
     try {
-      final uri = buildSearchUri(
-        query,
-        limit: limit,
-        nearLatitude: nearLatitude,
-        nearLongitude: nearLongitude,
+      // Primero se busca acotado a la zona del usuario (o Bucaramanga si aún
+      // no se conoce su ubicación real). Solo si eso no encuentra nada se
+      // repite sin la restricción dura, para no perder direcciones legítimas
+      // que estén lejos (p. ej. una recogida fuera de la ciudad habitual).
+      final resultadosCercanos = await _fetchNominatim(
+        buildSearchUri(
+          query,
+          limit: limit,
+          nearLatitude: nearLatitude,
+          nearLongitude: nearLongitude,
+          bounded: true,
+        ),
       );
+      if (resultadosCercanos.isNotEmpty) return resultadosCercanos;
 
-      final response = await http.get(
-        uri,
-        headers: {'Accept': 'application/json', 'User-Agent': 'Loginova/1.0'},
+      return await _fetchNominatim(
+        buildSearchUri(
+          query,
+          limit: limit,
+          nearLatitude: nearLatitude,
+          nearLongitude: nearLongitude,
+        ),
       );
-
-      if (response.statusCode != 200) return [];
-
-      final data = jsonDecode(response.body) as List<dynamic>;
-      return data
-          .map((item) => _nominatimResultToSuggestion(item as Map<String, dynamic>))
-          .whereType<AddressSuggestion>()
-          .toList();
     } catch (e) {
       AppLogger.warn('Error en búsqueda de direcciones: $e', error: e);
       return [];
     }
+  }
+
+  static Future<List<AddressSuggestion>> _fetchNominatim(Uri uri) async {
+    final response = await http.get(
+      uri,
+      headers: _nominatimHeaders,
+    );
+
+    if (response.statusCode != 200) return [];
+
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data
+        .map((item) => _nominatimResultToSuggestion(item as Map<String, dynamic>))
+        .whereType<AddressSuggestion>()
+        .toList();
   }
 
   static Future<String?> _reverseNominatim(
@@ -303,7 +373,7 @@ class GeocodingService {
 
       final response = await http.get(
         uri,
-        headers: {'Accept': 'application/json', 'User-Agent': 'Loginova/1.0'},
+        headers: _nominatimHeaders,
       );
 
       if (response.statusCode != 200) {

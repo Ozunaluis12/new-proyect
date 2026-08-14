@@ -53,6 +53,20 @@ class _CrearRecogidaScreenState extends State<CrearRecogidaScreen> {
   bool _guardando = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Se pide la ubicación real apenas se abre la pantalla (en vez de
+    // depender de que el usuario haya visitado antes el mapa), para que el
+    // buscador de direcciones tenga sesgo geográfico desde la primera
+    // búsqueda.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<LocationProvider>(context, listen: false).getCurrentLocation();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _direccionDebounceTimer?.cancel();
     _nombreController.dispose();
@@ -774,7 +788,14 @@ class _LocationPickerScreenState extends State<_LocationPickerScreen> {
       );
       _selectedLocation = _centerLocation;
     } else {
-      _centerLocation = const LatLng(6.2442, -75.5812); // Medellín por defecto
+      final ciudadLat = GeocodingService.ubicacionPorDefectoLatitud;
+      final ciudadLon = GeocodingService.ubicacionPorDefectoLongitud;
+      _centerLocation = (ciudadLat != null && ciudadLon != null)
+          // Ciudad de operación de la empresa del usuario logueado.
+          ? LatLng(ciudadLat, ciudadLon)
+          // Nada configurado todavía: centro geográfico de Colombia, neutral
+          // en vez de asumir una ciudad puntual.
+          : const LatLng(4.5709, -74.2973);
     }
   }
 

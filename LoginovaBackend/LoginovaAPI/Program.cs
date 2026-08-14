@@ -19,6 +19,18 @@ CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Monitoreo de errores en producción: sin "Sentry:Dsn" configurado el SDK
+// queda deshabilitado (no-op) y no manda nada, así que es seguro dejarlo
+// siempre presente en vez de condicionarlo a mano. Cuando se configure el
+// DSN, empieza a reportar excepciones no controladas automáticamente,
+// incluidas las que ya captura app.UseExceptionHandler más abajo.
+builder.WebHost.UseSentry(options =>
+{
+    options.Dsn = builder.Configuration["Sentry:Dsn"];
+    options.Environment = builder.Environment.EnvironmentName;
+    options.TracesSampleRate = 0.2;
+});
+
 builder.Services.AddHttpContextAccessor();
 // Multi-tenant: resuelve la empresa del request actual (claim "empresaId"
 // del JWT). AppDbContext lo usa para los filtros de consulta globales que

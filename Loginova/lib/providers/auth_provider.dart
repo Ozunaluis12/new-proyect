@@ -6,10 +6,13 @@ import '../models/usuario.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
+import '../services/geocoding_service.dart';
+import '../services/mi_empresa_service.dart';
 
 /// Provider que gestiona el estado de autenticación de la aplicación.
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final MiEmpresaService _miEmpresaService = MiEmpresaService();
 
   bool _logueado = false;
   bool _cargando = false;
@@ -35,7 +38,25 @@ class AuthProvider extends ChangeNotifier {
       _usuario = Usuario.fromJson(jsonDecode(usuarioJson));
       _logueado = true;
       notifyListeners();
+      // No se espera: no debe demorar el arranque de la app si la red está
+      // lenta. Mientras tanto el buscador de direcciones sigue funcionando
+      // sin sesgo de ciudad (solo restringido a Colombia).
+      _aplicarCiudadDeOperacion();
     }
+  }
+
+  /// Carga la ciudad de operación de la empresa del usuario logueado y la
+  /// fija como sesgo por defecto del buscador de direcciones (en vez de una
+  /// ciudad fija en el código), para que las sugerencias sean relevantes
+  /// desde la primera búsqueda aunque el operador aún no tenga GPS. Si la
+  /// empresa no tiene ciudad configurada, o el usuario es de Soporte (sin
+  /// empresa), simplemente no queda sesgo de ciudad.
+  Future<void> _aplicarCiudadDeOperacion() async {
+    final miEmpresa = await _miEmpresaService.obtenerMiEmpresa();
+    GeocodingService.configurarUbicacionPorDefecto(
+      miEmpresa?.latitudOperacion,
+      miEmpresa?.longitudOperacion,
+    );
   }
 
   /// Intenta iniciar sesión con correo y contraseña.
@@ -70,6 +91,7 @@ class AuthProvider extends ChangeNotifier {
     _usuario = result.usuario;
     // Registra/actualiza el token FCM en el backend tras iniciar sesión
     await FirebaseService.updateFCMToken();
+    await _aplicarCiudadDeOperacion();
     notifyListeners();
     return true;
   }
@@ -124,6 +146,9 @@ class AuthProvider extends ChangeNotifier {
     await ApiService.clearSession();
     _logueado = false;
     _usuario = null;
+    // Evita que el sesgo de ciudad de esta empresa se filtre a la sesión de
+    // otra si el siguiente usuario en loguearse es de una empresa distinta.
+    GeocodingService.configurarUbicacionPorDefecto(null, null);
 
     notifyListeners();
   }

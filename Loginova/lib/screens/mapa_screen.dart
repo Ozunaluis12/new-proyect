@@ -9,6 +9,7 @@ import '../providers/recogida_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/maps_provider.dart';
 import '../providers/proximity_provider.dart';
+import '../services/geocoding_service.dart';
 import '../services/location_service.dart';
 import '../services/maps_service.dart' as maps_service;
 import '../services/proximity_service.dart';
@@ -40,8 +41,16 @@ class _MapaScreenState extends State<MapaScreen> {
   maps_service.RouteInfo? _rutaInfo;
   bool _calculandoRuta = false;
 
-  // Ubicación por defecto mientras carga el GPS (usada solo como fallback)
-  static const LatLng _ubicacionFallback = LatLng(6.2442, -75.5812);
+  // Ubicación por defecto mientras carga el GPS: la ciudad de operación de
+  // la empresa del usuario logueado si está configurada, o si no, el centro
+  // geográfico de Colombia (neutral, no asume una ciudad puntual).
+  LatLng get _ubicacionFallback {
+    final lat = GeocodingService.ubicacionPorDefectoLatitud;
+    final lon = GeocodingService.ubicacionPorDefectoLongitud;
+    return (lat != null && lon != null)
+        ? LatLng(lat, lon)
+        : const LatLng(4.5709, -74.2973);
+  }
   static const double _zoomInicial =
       15; // Zoom más cercano para ver la ubicación real
 

@@ -36,9 +36,12 @@ public class PasswordHasherTests
     }
 
     [Fact]
-    public void Verify_WithLegacyPlainTextPassword_IsBackwardCompatible()
+    public void Verify_WithLegacyPlainTextHash_AlwaysReturnsFalse()
     {
-        // Arrange
+        // Arrange: el fallback a texto plano se quitó deliberadamente por
+        // seguridad (ver comentario de PasswordHasher). Un hash legado sin el
+        // prefijo "pbkdf2$" ya no debe validar, ni siquiera con la contraseña
+        // correcta; esa cuenta debe pasar por el flujo de recuperación.
         var hasher = new PasswordHasher();
 
         // Act
@@ -46,7 +49,7 @@ public class PasswordHasherTests
         var otherPassword = hasher.Verify("other", "legacy-pass");
 
         // Assert
-        Assert.True(samePassword);
+        Assert.False(samePassword);
         Assert.False(otherPassword);
     }
 }

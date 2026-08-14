@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/empresa.dart';
 import '../providers/empresas_provider.dart';
+import '../services/geocoding_service.dart';
 import '../themes/app_theme.dart';
 import '../widgets/responsive_center.dart';
 
@@ -30,6 +31,14 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
   late final TextEditingController _correoController;
   late final TextEditingController _montoController;
   late final TextEditingController _notasController;
+  late final TextEditingController _ciudadOperacionController;
+
+  // Coordenadas ya resueltas de _ciudadOperacionController: se recalculan
+  // (geocodificando el texto) solo si el usuario cambió la ciudad respecto a
+  // lo que ya estaba guardado, para no golpear la API en cada edición.
+  double? _latitudOperacion;
+  double? _longitudOperacion;
+  bool _geocodificandoCiudad = false;
 
   late final TextEditingController _adminNombreController;
   late final TextEditingController _adminCorreoController;
@@ -66,6 +75,11 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
           : '',
     );
     _notasController = TextEditingController(text: empresa?.notas ?? '');
+    _ciudadOperacionController = TextEditingController(
+      text: empresa?.ciudadOperacion ?? '',
+    );
+    _latitudOperacion = empresa?.latitudOperacion;
+    _longitudOperacion = empresa?.longitudOperacion;
 
     _adminNombreController = TextEditingController();
     _adminCorreoController = TextEditingController();
@@ -86,6 +100,7 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
     _correoController.dispose();
     _montoController.dispose();
     _notasController.dispose();
+    _ciudadOperacionController.dispose();
     _adminNombreController.dispose();
     _adminCorreoController.dispose();
     _adminPasswordController.dispose();
@@ -129,6 +144,52 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
     });
   }
 
+  /// Resuelve las coordenadas de la ciudad de operación escrita, solo si
+  /// cambió respecto a lo ya guardado (para no geocodificar en cada edición
+  /// aunque la ciudad no se haya tocado). Si la geocodificación falla, la
+  /// empresa igual se guarda sin coordenadas: el buscador de direcciones
+  /// simplemente no tendrá sesgo de esa ciudad hasta que se corrija.
+  Future<void> _resolverCiudadOperacion() async {
+    final ciudad = _ciudadOperacionController.text.trim();
+
+    if (ciudad.isEmpty) {
+      _latitudOperacion = null;
+      _longitudOperacion = null;
+      return;
+    }
+
+    if (ciudad == widget.empresa?.ciudadOperacion &&
+        _latitudOperacion != null &&
+        _longitudOperacion != null) {
+      return;
+    }
+
+    setState(() => _geocodificandoCiudad = true);
+    try {
+      final ubicacion = await GeocodingService.geocodeAddress(
+        '$ciudad, Colombia',
+      );
+      _latitudOperacion = ubicacion?.latitude;
+      _longitudOperacion = ubicacion?.longitude;
+
+      if (ubicacion == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se pudo ubicar esa ciudad; se guardará sin sesgo de '
+              'búsqueda hasta que la corrijas.',
+            ),
+            backgroundColor: LoginovaColors.warning,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _geocodificandoCiudad = false);
+      }
+    }
+  }
+
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -145,8 +206,11 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
     }
 
     setState(() => _guardando = true);
+    final provider = Provider.of<EmpresasProvider>(context, listen: false);
 
     try {
+      await _resolverCiudadOperacion();
+
       final monto = double.tryParse(_montoController.text.trim());
       final empresa = Empresa(
         id: widget.empresa?.id ?? 0,
@@ -159,13 +223,16 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
         montoMembresia: monto,
         cicloPago: _cicloPago,
         notas: _notasController.text.trim(),
+        ciudadOperacion: _ciudadOperacionController.text.trim().isEmpty
+            ? null
+            : _ciudadOperacionController.text.trim(),
+        latitudOperacion: _latitudOperacion,
+        longitudOperacion: _longitudOperacion,
         activa: widget.empresa?.activa ?? true,
         fechaCreacion: widget.empresa?.fechaCreacion ?? DateTime.now(),
         estadoMembresia: widget.empresa?.estadoMembresia ?? 'Vigente',
         diasParaVencimiento: widget.empresa?.diasParaVencimiento ?? 0,
       );
-
-      final provider = Provider.of<EmpresasProvider>(context, listen: false);
 
       if (_editando) {
         await provider.actualizarEmpresa(widget.empresa!.id, empresa);
@@ -230,6 +297,30 @@ class _CrearEditarEmpresaScreenState extends State<CrearEditarEmpresaScreen> {
                   validator: (value) => (value == null || value.trim().isEmpty)
                       ? 'Ingresa el nombre de la empresa'
                       : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _ciudadOperacionController,
+                  decoration: InputDecoration(
+                    labelText: 'Ciudad de operación',
+                    hintText: 'Ej: Bucaramanga, Santander',
+                    prefixIcon: const Icon(Icons.location_city),
+                    helperText:
+                        'El buscador de direcciones de la app prioriza '
+                        'resultados cerca de esta ciudad mientras el '
+                        'operador no tiene GPS disponible.',
+                    helperMaxLines: 3,
+                    suffixIcon: _geocodificandoCiudad
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : null,
+                  ),
                 ),
                 const SizedBox(height: 24),
 

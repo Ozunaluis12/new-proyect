@@ -13,6 +13,9 @@ public record CrearEmpresaRequest(
     decimal? MontoMembresia,
     string? CicloPago,
     string? Notas,
+    string? CiudadOperacion,
+    double? LatitudOperacion,
+    double? LongitudOperacion,
     [Required] string AdminNombre,
     [Required, EmailAddress] string AdminCorreo,
     [Required, MinLength(8)] string AdminPassword);
@@ -27,7 +30,10 @@ public record ActualizarEmpresaRequest(
     [Required] DateTime FechaFinMembresia,
     decimal? MontoMembresia,
     string? CicloPago,
-    string? Notas);
+    string? Notas,
+    string? CiudadOperacion,
+    double? LatitudOperacion,
+    double? LongitudOperacion);
 
 /// <summary>Datos de una empresa devueltos por la API, con el estado de membresía ya calculado.</summary>
 public record EmpresaResponse(
@@ -41,6 +47,9 @@ public record EmpresaResponse(
     decimal? MontoMembresia,
     string? CicloPago,
     string? Notas,
+    string? CiudadOperacion,
+    double? LatitudOperacion,
+    double? LongitudOperacion,
     bool Activa,
     DateTime? UltimoRecordatorioEnviado,
     DateTime FechaCreacion,
@@ -66,8 +75,18 @@ public record ResumenSoporteEmpresaResponse(
     decimal MontoTotalIngresos,
     DateTime? UltimaRecogida);
 
-/// <summary>Nombre de la propia empresa del usuario autenticado (para mostrarlo en la app, p. ej. en el botón de contactar soporte).</summary>
-public record MiEmpresaResponse(int Id, string NombreEmpresa);
+/// <summary>
+/// Datos de la propia empresa del usuario autenticado: el nombre (para
+/// mostrarlo en la app, p. ej. en el botón de contactar soporte) y su ciudad
+/// de operación, que la app usa como sesgo por defecto del buscador de
+/// direcciones mientras no tiene la ubicación GPS real del operador.
+/// </summary>
+public record MiEmpresaResponse(
+    int Id,
+    string NombreEmpresa,
+    string? CiudadOperacion,
+    double? LatitudOperacion,
+    double? LongitudOperacion);
 
 /// <summary>
 /// Contraseña temporal generada para un usuario que quedó bloqueado. Se

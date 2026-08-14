@@ -83,6 +83,9 @@ public class EmpresasController : ControllerBase
             MontoMembresia = request.MontoMembresia,
             CicloPago = request.CicloPago,
             Notas = request.Notas,
+            CiudadOperacion = request.CiudadOperacion,
+            LatitudOperacion = request.LatitudOperacion,
+            LongitudOperacion = request.LongitudOperacion,
             Activa = true,
         };
         _context.Empresas.Add(empresa);
@@ -135,6 +138,9 @@ public class EmpresasController : ControllerBase
         empresa.MontoMembresia = request.MontoMembresia;
         empresa.CicloPago = request.CicloPago;
         empresa.Notas = request.Notas;
+        empresa.CiudadOperacion = request.CiudadOperacion;
+        empresa.LatitudOperacion = request.LatitudOperacion;
+        empresa.LongitudOperacion = request.LongitudOperacion;
 
         await _context.SaveChangesAsync();
 
@@ -835,6 +841,9 @@ public class EmpresasController : ControllerBase
             empresa.MontoMembresia,
             empresa.CicloPago,
             empresa.Notas,
+            empresa.CiudadOperacion,
+            empresa.LatitudOperacion,
+            empresa.LongitudOperacion,
             empresa.Activa,
             empresa.UltimoRecordatorioEnviado,
             empresa.FechaCreacion,

@@ -1,4 +1,4 @@
-package com.example.loginova
+package com.loginova.app
 
 import io.flutter.embedding.android.FlutterActivity
 

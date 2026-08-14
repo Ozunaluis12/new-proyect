@@ -171,8 +171,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   horizontal: isMobile ? 20 : 40,
                   vertical: 20,
                 ),
-                child: SizedBox(
-                  height: size.height - 40,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: size.height - 40),
                   child: ResponsiveCenter(
                     maxWidth: 420,
                     child: Column(

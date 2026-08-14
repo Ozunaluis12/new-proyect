@@ -1,0 +1,67 @@
+name: CI
+
+# Corre en cada push/PR a master: nada llega a main sin que compile y pasen
+# las pruebas. Antes de esto, dos bugs reales (un overflow visual y un test
+# de seguridad desactualizado) llevaban tiempo sin detectarse porque nadie
+# corría las suites automáticamente.
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  backend:
+    name: Backend (.NET)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: LoginovaBackend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restaurar dependencias
+        run: dotnet restore LoginovaAPI.Tests/LoginovaAPI.Tests.csproj
+
+      - name: Compilar
+        run: dotnet build LoginovaAPI.Tests/LoginovaAPI.Tests.csproj --no-restore --configuration Release
+
+      - name: Ejecutar pruebas
+        run: dotnet test LoginovaAPI.Tests/LoginovaAPI.Tests.csproj --no-build --configuration Release --logger "trx" --results-directory TestResults
+
+      - name: Publicar resultados de pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: LoginovaBackend/TestResults
+          retention-days: 14
+
+  frontend:
+    name: Frontend (Flutter)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Loginova
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Instalar dependencias
+        run: flutter pub get
+
+      - name: Analizar (flutter analyze)
+        run: flutter analyze --no-fatal-infos
+
+      - name: Ejecutar pruebas
+        run: flutter test

@@ -26,7 +26,7 @@ services:
       - key: Jwt__Audience
         value: LoginovaClient
       - key: Cors__AllowedOrigins__0
-        value: https://loginova-api.onrender.com
+        value: https://loginova01.netlify.app
       - key: Smtp__Host
         value: smtp.gmail.com
       - key: Smtp__Port
@@ -52,4 +52,6 @@ services:
       - key: Resend__From
         sync: false
       - key: Licencia__FechaVencimiento
+        sync: false
+      - key: Sentry__Dsn
         sync: false

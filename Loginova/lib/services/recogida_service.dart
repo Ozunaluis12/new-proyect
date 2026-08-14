@@ -104,8 +104,21 @@ class RecogidaService {
       request.headers['Authorization'] = 'Bearer $token';
     }
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
+    http.Response response;
+    try {
+      final streamedResponse = await request.send();
+      response = await http.Response.fromStream(streamedResponse);
+    } catch (_) {
+      // La foto puede tardar varios segundos en subir en datos móviles: si
+      // la conexión se cae justo después de que el servidor ya procesó y
+      // guardó el cambio, pero antes de que la respuesta llegue al
+      // teléfono, esto se ve como un error de red aunque el guardado sí
+      // ocurrió. En vez de reportar un fallo falso, se confirma el estado
+      // real antes de rendirse.
+      final actual = await _verificarSiQuedoGuardado(recogidaId, estado);
+      if (actual != null) return actual;
+      rethrow;
+    }
 
     if (response.statusCode != 200) {
       throw Exception('No se pudo actualizar el estado de la recogida');
@@ -118,6 +131,24 @@ class RecogidaService {
       return Recogida.fromJson(jsonDecode(response.body));
     } catch (_) {
       return obtenerRecogidaPorId(recogidaId);
+    }
+  }
+
+  /// Confirma si el cambio de estado ya quedó aplicado del lado del
+  /// servidor pese al error de red, para no dejar al operador con un falso
+  /// "no se pudo guardar" cuando en realidad sí se guardó. Devuelve null si
+  /// no se pudo confirmar (ahí sí se reporta el error tal cual).
+  Future<Recogida?> _verificarSiQuedoGuardado(
+    int recogidaId,
+    String estadoEsperado,
+  ) async {
+    try {
+      final actual = await obtenerRecogidaPorId(recogidaId);
+      return actual.estado.toLowerCase() == estadoEsperado.toLowerCase()
+          ? actual
+          : null;
+    } catch (_) {
+      return null;
     }
   }
 

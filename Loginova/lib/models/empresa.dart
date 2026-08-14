@@ -13,6 +13,12 @@ class Empresa {
   final double? montoMembresia;
   final String? cicloPago;
   final String? notas;
+  // Ciudad donde opera la empresa y sus coordenadas ya geocodificadas: se
+  // usan como sesgo por defecto del buscador de direcciones mientras el
+  // operador no tiene GPS disponible, en vez de una ciudad fija en el código.
+  final String? ciudadOperacion;
+  final double? latitudOperacion;
+  final double? longitudOperacion;
   final bool activa;
   final DateTime? ultimoRecordatorioEnviado;
   final DateTime fechaCreacion;
@@ -33,6 +39,9 @@ class Empresa {
     this.montoMembresia,
     this.cicloPago,
     this.notas,
+    this.ciudadOperacion,
+    this.latitudOperacion,
+    this.longitudOperacion,
     this.activa = true,
     this.ultimoRecordatorioEnviado,
     required this.fechaCreacion,
@@ -54,6 +63,9 @@ class Empresa {
       montoMembresia: json['montoMembresia']?.toDouble(),
       cicloPago: json['cicloPago'],
       notas: json['notas'],
+      ciudadOperacion: json['ciudadOperacion'],
+      latitudOperacion: json['latitudOperacion']?.toDouble(),
+      longitudOperacion: json['longitudOperacion']?.toDouble(),
       activa: json['activa'] ?? true,
       ultimoRecordatorioEnviado: json['ultimoRecordatorioEnviado'] != null
           ? DateTime.parse(json['ultimoRecordatorioEnviado']).toLocal()
@@ -78,6 +90,9 @@ class Empresa {
       'montoMembresia': montoMembresia,
       'cicloPago': cicloPago,
       'notas': notas,
+      'ciudadOperacion': ciudadOperacion,
+      'latitudOperacion': latitudOperacion,
+      'longitudOperacion': longitudOperacion,
     };
   }
 }

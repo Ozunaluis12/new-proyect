@@ -9,6 +9,10 @@
 <!-- Permisos para almacenamiento -->
 <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+<!-- Requerido en Android 13+ (API 33) para mostrar notificaciones push
+     (FCM/flutter_local_notifications): sin este permiso, el sistema las
+     bloquea en silencio aunque el token FCM se registre bien. -->
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:label="loginova"
         android:name="${applicationName}"

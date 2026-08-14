@@ -2,6 +2,10 @@ param(
     [string]$EnvFile = '.env.local.ps1',
     [string]$ApiBaseUrl = 'http://127.0.0.1:5105/api',
     [string]$Device = 'windows',
+    # Token de Mapbox para autocompletado de direcciones más preciso (opcional).
+    # Si se omite, usa $env:MAPBOX_ACCESS_TOKEN si está definida, o cae a
+    # Nominatim/OpenStreetMap (gratis, sin token, funciona igual).
+    [string]$MapboxToken = $env:MAPBOX_ACCESS_TOKEN,
     [switch]$PubGet
 )
 
@@ -55,8 +59,15 @@ if ($PubGet) {
     flutter pub get
 }
 
+$dartDefines = @("API_BASE_URL=$ApiBaseUrl")
+if ($MapboxToken) {
+    Write-Host 'Run-local: MAPBOX_ACCESS_TOKEN detectado, se usará Mapbox para direcciones.' -ForegroundColor Yellow
+    $dartDefines += "MAPBOX_ACCESS_TOKEN=$MapboxToken"
+}
+$dartDefineArgs = @($dartDefines | ForEach-Object { "--dart-define=$_" })
+
 Write-Host 'Ejecutando Flutter run...' -ForegroundColor Cyan
-flutter run -d $Device --dart-define=API_BASE_URL=$ApiBaseUrl
+flutter run -d $Device @dartDefineArgs
 $exitCode = $LASTEXITCODE
 Pop-Location
 exit $exitCode

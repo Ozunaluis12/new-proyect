@@ -11,7 +11,12 @@ RUN dotnet publish -c Release -o /app/publish --no-restore
 # Etapa de ejecución (imagen liviana, sin el SDK)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
-COPY --from=build /app/publish .
+# La imagen oficial trae un usuario "app" sin privilegios listo para usar;
+# --chown lo deja como dueño de los archivos para que además pueda escribir
+# en App_Data/uploads (el respaldo de disco local cuando R2 no está
+# configurado) sin necesitar root.
+COPY --from=build --chown=app:app /app/publish .
+USER app
 
 # Render inyecta el puerto real en la variable de entorno PORT.
 ENV ASPNETCORE_ENVIRONMENT=Production
